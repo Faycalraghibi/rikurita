@@ -1,0 +1,64 @@
+# Rikurita Configuration File
+
+user_profile:
+  name: "Faycal Raghibi"
+  email: "faycal.raghibi@etu.imt-nord-europe.fr"
+  phone: "+33 6 52 26 52 49"
+  linkedin: "linkedin.com/in/faycal-raghibi"
+  github: "github.com/Faycalraghibi"
+  kaggle: "kaggle.com/raghibifaycal"
+  
+  background:
+    summary: "Engineering student specializing in Data Science and AI with hands-on experience in LLM agents, MLOps, and full-stack development."
+    skills:
+      - "Python"
+      - "Machine Learning"
+      - "Deep Learning"
+      - "LangGraph"
+      - "LLM Agents"
+      - "FastAPI"
+      - "Docker"
+      - "Kubernetes"
+    experience_years: 2
+    
+  target_criteria:
+    desired_roles:
+      - "Machine Learning Engineer Intern"
+      - "Data Scientist Intern"
+      - "AI Engineer Intern"
+      - "Research Intern"
+    desired_industries:
+      - "Tech"
+      - "AI/ML"
+      - "Finance"
+      - "Research"
+    minimum_salary: 0  # Intern positions
+    preferred_locations:
+      - "France"
+      - "Remote"
+      - "Paris"
+      - "Lille"
+    deal_breakers:
+      - "No visa sponsorship required"
+
+job_search:
+  keywords: "machine learning engineer intern"
+  location: "france"
+  experience_level: "internship"
+  date_posted: "week"  # "day", "week", "month"
+  max_jobs_per_run: 50
+  relevance_threshold: 7  # Minimum score to proceed (0-10)
+
+resume_template:
+  base_latex_file: "templates/base_resume.tex"
+  style: "modern"
+
+llm_settings:
+  model: "anthropic/claude-3.5-sonnet"  # OpenRouter model identifier
+  max_tokens: 4096
+  temperature: 0.3
+
+schedule:
+  enabled: false
+  interval: "daily"  # "hourly", "daily", "weekly"
+  time: "09:00"  # For daily/weekly schedules

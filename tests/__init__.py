@@ -1,0 +1,3 @@
+"""
+Rikurita Tests Package
+"""

@@ -1,0 +1,151 @@
+\documentclass[11pt,a4paper]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=0.7in]{geometry}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{titlesec}
+
+% Formatting
+\pagestyle{empty}
+\setlist[itemize]{left=0pt, label={--}, nosep, after=\vspace{1pt}, topsep=0pt}
+\titleformat{\section}{\large\bfseries\uppercase}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{6pt}{3pt}
+
+% Custom commands
+\newcommand{\resumeItem}[1]{\item\small{#1}}
+\newcommand{\resumeSubheading}[4]{
+  \vspace{1pt}
+  \noindent\textbf{#1} \hfill #2 \\
+  \textit{#3} \hfill \textit{#4}
+  \vspace{0pt}
+}
+\newcommand{\resumeProjectHeading}[2]{
+  \vspace{1pt}
+  \noindent\textbf{#1} \hfill \textit{#2}
+  \vspace{0pt}
+}
+
+\begin{document}
+
+\vspace*{-15mm}
+% Header
+\begin{center}
+    {\LARGE \textbf{Faycal Raghibi}} \\
+
+    \href{mailto:faycal.raghibi@etu.imt-nord-europe.fr}{faycal.raghibi@etu.imt-nord-europe.fr} $|$ 
+    +33 6 52 26 52 49 $|$ 
+    \href{https://linkedin.com/in/faycal-raghibi}{linkedin.com/in/faycal-raghibi} \\
+    \href{https://github.com/Faycalraghibi}{github.com/Faycalraghibi} $|$ 
+    \href{https://kaggle.com/raghibifaycal}{kaggle.com/raghibifaycal}
+\end{center}
+
+\vspace{-10pt}
+
+% Education
+\section{Education}
+
+\resumeSubheading
+{IMT Nord Europe}{Lille, France}
+{Engineering Degree In Data Science and Artificial Intelligence}{Sept. 2025 -- Jul. 2027}
+
+\resumeSubheading
+{Mohammed VI International Academy of Civil Aviation}{Casablanca, Morocco}
+{State Engineering Degree In Computer Engineering}{Oct. 2023 -- Jul. 2027}
+
+\resumeSubheading
+{Higher school preparatory classes}{Fes, Morocco}
+{Two-year intensive program in advanced mathematics and physics}{Sept. 2021 -- Apr. 2023}
+
+% Certifications
+\section{Certifications}
+
+\vspace{-2pt}
+\begin{minipage}[t]{0.48\textwidth}
+\begin{itemize}
+    \resumeItem{Building Generative AI Skills for Developers}
+    \resumeItem{DevOps Foundations}
+    \resumeItem{Oracle Cloud Infrastructure 2024 AI Foundations Associate}
+\end{itemize}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\begin{itemize}
+    \resumeItem{Deep Learning Specialization (Andrew Ng)}
+    \resumeItem{Machine Learning Specialization (Andrew Ng)}
+    \resumeItem{MLOps Essentials for Developers and AI Engineers}
+\end{itemize}
+\end{minipage}
+
+% Experience
+\section{Experience}
+
+\resumeSubheading
+{Oracle}{Casablanca, Morocco}
+{Research Assistant}{Jul. 2025 -- Sept. 2025}
+\begin{itemize}
+    \resumeItem{Stabilized an agent execution runtime by diagnosing and resolving critical failures impacting autonomous agent reasoning, execution, and inference reliability.}
+    \resumeItem{Refactored database and inference integration layers, strengthening MCP-based orchestration across local and custom LLM backends.}
+    \resumeItem{Improved agent coordination, tool-use, and execution patterns, aligned with Agent Spec best practices.}
+    \resumeItem{Authored and structured technical documentation covering deployment, orchestration, and observability to accelerate team onboarding.}
+\end{itemize}
+
+\resumeSubheading
+{Arrow Electronics}{Casablanca, Morocco}
+{Technical Intern}{Jul. 2024 -- Aug. 2024}
+\begin{itemize}
+    \resumeItem{Validated reliability of a microservices-based system through API testing (Postman), collaborating in an agile engineering environment.}
+\end{itemize}
+
+% Projects
+\section{Projects}
+
+\resumeProjectHeading
+{Joshu}{Python, LangGraph, MCP, FastAPI, GitHub Actions}
+\begin{itemize}
+    \resumeItem{Designed and developed an agent-based platform orchestrating autonomous LLM agents with secure tool-use, persistent semantic memory, and context management.}
+    \resumeItem{Implemented multi-agent coordination workflows and an Agent-to-Agent (A2A) server exposed via FastAPI and SSE.}
+    \resumeItem{Industrialized the project with CI/CD pipelines, automated testing, and cross-platform support, ensuring scalability and reliability.}
+\end{itemize}
+
+\resumeProjectHeading
+{Juridia's Multilingual Legal Translation}{Hugging Face, Helsinki-NLP, LoRA, BLEU}
+\begin{itemize}
+    \resumeItem{Fine-tuned sequence-to-sequence models using LoRA for domain-specific translation and evaluated performance with BLEU metrics.}
+\end{itemize}
+
+\resumeProjectHeading
+{LogoCraftAI}{Next.js, Mistral, Hugging Face, Firebase}
+\begin{itemize}
+    \resumeItem{Built an end-to-end generative AI pipeline, from prompt optimization to production-ready deployment.}
+\end{itemize}
+
+\vspace{-5pt}
+
+% Skills
+\section{Skills}
+
+
+\hspace{-12pt}\textbf{Programming Languages:} Python, C++, Java, SQL, JavaScript, Bash. \\
+\vspace{1pt}
+\textbf{Frameworks and Libraries:} TensorFlow, PyTorch, Scikit-learn, MLflow, Langraph, FastAPI, Spring Boot, BigQuery React/Next. \\
+\vspace{1pt}
+\textbf{Other Technologies:} Spark, Kubernetes, Docker/Colima, Linux, Jenkins, Git, Power BI, Jira/Confluence. \\
+\vspace{1pt}
+\textbf{Other Skills:}  LLM Agents, MCP, Tool-use, Prompt Engineering, OCI/GCP. \\
+\vspace{1pt}
+\textbf{Languages:} English (Professional), French (Professional), Arabic (Native Speaker).
+
+% Extracurricular Activities
+\section{Extracurricular Activities}
+
+\resumeSubheading
+{AIAC IT Club}{Casablanca, Morocco}
+{Data Cell Leader}{Sept. 2024 -- Jun. 2025}
+\begin{itemize}
+    \resumeItem{Led a 20-member data team (DS, DE, DA), supervised multiple AI projects, and delivered hands-on workshops in data science and machine learning.}
+\end{itemize}
+
+\end{document}
