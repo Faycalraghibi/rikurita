@@ -137,12 +137,12 @@ user_profile:
   email: "email@example.com"
   phone: "+1234567890"
   linkedin: "linkedin.com/in/yourprofile"
-  
+
   background:
     summary: "Your professional summary"
     skills: ["Python", "ML", "Data Science"]
     experience_years: 5
-    
+
   target_criteria:
     desired_roles: ["Data Scientist", "ML Engineer"]
     desired_industries: ["Tech", "Finance"]
@@ -155,7 +155,7 @@ job_search:
   location: "france"
   experience_level: "intern"
   max_jobs_per_run: 50
-  
+
 resume_template:
   base_latex_file: "templates/base_resume.tex"
   style: "modern"  # modern, classic, academic
@@ -167,7 +167,7 @@ personal:
   name: "Your Name"
   title: "Your Title"
   email: "email@example.com"
-  
+
 experience:
   - company: "Company A"
     role: "Senior Engineer"
@@ -175,12 +175,12 @@ experience:
     achievements:
       - "Achievement 1"
       - "Achievement 2"
-      
+
 education:
   - degree: "Master of Science"
     institution: "University Name"
     year: 2020
-    
+
 skills:
   technical: ["Python", "TensorFlow", "AWS"]
   soft: ["Leadership", "Communication"]

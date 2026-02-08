@@ -7,7 +7,7 @@ user_profile:
   linkedin: "linkedin.com/in/faycal-raghibi"
   github: "github.com/Faycalraghibi"
   kaggle: "kaggle.com/raghibifaycal"
-  
+
   background:
     summary: "Engineering student specializing in Data Science and AI with hands-on experience in LLM agents, MLOps, and full-stack development."
     skills:
@@ -20,7 +20,7 @@ user_profile:
       - "Docker"
       - "Kubernetes"
     experience_years: 2
-    
+
   target_criteria:
     desired_roles:
       - "Machine Learning Engineer Intern"

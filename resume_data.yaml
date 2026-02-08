@@ -15,12 +15,12 @@ education:
     location: "Lille, France"
     degree: "Engineering Degree in Data Science and Artificial Intelligence"
     dates: "Sept. 2025 -- Jul. 2027"
-    
+
   - institution: "Mohammed VI International Academy of Civil Aviation"
     location: "Casablanca, Morocco"
     degree: "State Engineering Degree in Computer Engineering"
     dates: "Oct. 2023 -- Jul. 2027"
-    
+
   - institution: "Higher school preparatory classes"
     location: "Fes, Morocco"
     degree: "Two-year intensive program in advanced mathematics and physics"
@@ -44,7 +44,7 @@ experience:
       - "Refactored database and inference integration layers, strengthening MCP-based orchestration across local and custom LLM backends."
       - "Improved agent coordination, tool-use, and execution patterns, aligned with Agent Spec best practices."
       - "Authored and structured technical documentation covering deployment, orchestration, and observability to accelerate team onboarding."
-      
+
   - company: "Arrow Electronics"
     location: "Casablanca, Morocco"
     role: "Technical Intern"
@@ -59,12 +59,12 @@ projects:
       - "Designed and developed an agent-based platform orchestrating autonomous LLM agents with secure tool-use, persistent semantic memory, and context management."
       - "Implemented multi-agent coordination workflows and an Agent-to-Agent (A2A) server exposed via FastAPI and SSE."
       - "Industrialized the project with CI/CD pipelines, automated testing, and cross-platform support, ensuring scalability and reliability."
-      
+
   - name: "Juridia's Multilingual Legal Translation"
     technologies: "Hugging Face, Helsinki-NLP, LoRA, BLEU"
     achievements:
       - "Fine-tuned sequence-to-sequence models using LoRA for domain-specific translation and evaluated performance with BLEU metrics."
-      
+
   - name: "LogoCraftAI"
     technologies: "Next.js, Mistral, Hugging Face, Firebase"
     achievements:

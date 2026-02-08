@@ -4,14 +4,15 @@ Workflow State Schema
 Defines the state structure for the LangGraph workflow.
 """
 
-from typing import TypedDict, Optional, Annotated
+import operator
 from dataclasses import dataclass, field
 from enum import Enum
-import operator
+from typing import Annotated, TypedDict
 
 
 class ApplicationStatus(Enum):
     """Status of a job application."""
+
     PENDING = "Pending"
     APPLIED = "Applied"
     SKIPPED = "Skipped"
@@ -21,7 +22,7 @@ class ApplicationStatus(Enum):
 @dataclass
 class JobData:
     """Structured job data extracted from Apify."""
-    
+
     job_id: str = ""
     job_post_link: str = ""
     title: str = ""
@@ -35,7 +36,7 @@ class JobData:
     description: str = ""
     application_url: str = ""
     required_skills: list[str] = field(default_factory=list)
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
@@ -53,7 +54,7 @@ class JobData:
             "application_url": self.application_url,
             "required_skills": self.required_skills,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "JobData":
         """Create from dictionary."""
@@ -77,16 +78,16 @@ class JobData:
 @dataclass
 class RelevanceResult:
     """Result of LLM relevance check."""
-    
+
     score: float = 0.0
     reasoning: str = ""
     matching_points: list[str] = field(default_factory=list)
     missing_requirements: list[str] = field(default_factory=list)
-    
+
     def is_relevant(self, threshold: float = 7.0) -> bool:
         """Check if job meets relevance threshold."""
         return self.score >= threshold
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
@@ -95,7 +96,7 @@ class RelevanceResult:
             "matching_points": self.matching_points,
             "missing_requirements": self.missing_requirements,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "RelevanceResult":
         """Create from dictionary."""
@@ -110,14 +111,14 @@ class RelevanceResult:
 @dataclass
 class ProcessedJob:
     """A job that has been processed through the workflow."""
-    
+
     job: JobData = field(default_factory=JobData)
-    relevance: Optional[RelevanceResult] = None
+    relevance: RelevanceResult | None = None
     resume_path: str = ""
     resume_tex_path: str = ""
     status: ApplicationStatus = ApplicationStatus.PENDING
     error: str = ""
-    
+
     def to_dict(self) -> dict:
         """Convert to dictionary for logging."""
         return {
@@ -134,33 +135,33 @@ class ProcessedJob:
 class WorkflowState(TypedDict):
     """
     State schema for the LangGraph workflow.
-    
+
     This TypedDict defines all data that flows through the workflow nodes.
     """
-    
+
     # Configuration
     config: dict  # Loaded from config.yaml
     resume_data: dict  # Loaded from resume_data.yaml
     relevance_threshold: float  # Minimum score to proceed (default: 7)
     dry_run: bool  # If True, don't actually create resumes
-    
+
     # Job processing
     all_jobs: list[dict]  # All fetched jobs from Apify
     current_job_index: int  # Index of current job being processed
-    current_job: Optional[dict]  # Current job data
-    
+    current_job: dict | None  # Current job data
+
     # Relevance checking
-    relevance_result: Optional[dict]  # Result of relevance check
+    relevance_result: dict | None  # Result of relevance check
     is_relevant: bool  # Whether current job passed relevance check
-    
+
     # Resume generation
     generated_latex: str  # Generated LaTeX code
     resume_pdf_path: str  # Path to compiled PDF
     resume_tex_path: str  # Path to .tex source
-    
+
     # Processed jobs accumulator
     processed_jobs: Annotated[list[dict], operator.add]  # All processed jobs
-    
+
     # Statistics
     total_jobs: int
     jobs_processed: int
@@ -168,10 +169,10 @@ class WorkflowState(TypedDict):
     jobs_applied: int
     jobs_skipped: int
     jobs_failed: int
-    
+
     # Error tracking
     errors: Annotated[list[str], operator.add]  # Accumulated errors
-    
+
     # Control flow
     should_continue: bool  # Whether to continue processing more jobs
     workflow_complete: bool  # Whether workflow has finished
@@ -184,17 +185,17 @@ def create_initial_state(
 ) -> WorkflowState:
     """
     Create initial workflow state.
-    
+
     Args:
         config: Configuration from config.yaml.
         resume_data: Resume data from resume_data.yaml.
         dry_run: If True, don't create actual resumes.
-        
+
     Returns:
         Initial WorkflowState.
     """
     relevance_threshold = config.get("job_search", {}).get("relevance_threshold", 7)
-    
+
     return WorkflowState(
         config=config,
         resume_data=resume_data,
