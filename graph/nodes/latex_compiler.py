@@ -97,6 +97,8 @@ def compile_latex(
     """
     Compile LaTeX code to PDF.
     
+    Tries local compilers first, then falls back to online API.
+    
     Args:
         latex_code: LaTeX source code.
         output_dir: Directory to save output files.
@@ -116,7 +118,32 @@ def compile_latex(
     except Exception as e:
         return False, None, None, f"Failed to write .tex file: {e}"
     
-    # Create a temporary directory for compilation
+    # Try local compilation first
+    local_success, local_error = _try_local_compilation(latex_code, tex_path, pdf_path, filename)
+    if local_success:
+        return True, pdf_path, tex_path, ""
+    
+    # Fall back to online API
+    logger.info("Local compiler not available, trying online LaTeX API...")
+    online_success, online_error = _try_online_compilation(latex_code, pdf_path)
+    if online_success:
+        return True, pdf_path, tex_path, ""
+    
+    # Both failed
+    error_msg = f"Local: {local_error}. Online: {online_error}"
+    logger.error(f"All compilation methods failed: {error_msg}")
+    return False, None, tex_path, error_msg
+
+
+def _try_local_compilation(
+    latex_code: str,
+    tex_path: Path,
+    pdf_path: Path,
+    filename: str,
+) -> Tuple[bool, str]:
+    """Try compiling with local LaTeX compilers."""
+    import tempfile
+    
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_tex = Path(temp_dir) / f"{filename}.tex"
         temp_pdf = Path(temp_dir) / f"{filename}.pdf"
@@ -128,23 +155,18 @@ def compile_latex(
         compilers = [
             ["latexmk", "-pdf", "-interaction=nonstopmode", "-output-directory=" + temp_dir, str(temp_tex)],
             ["pdflatex", "-interaction=nonstopmode", "-output-directory=" + temp_dir, str(temp_tex)],
+            ["xelatex", "-interaction=nonstopmode", "-output-directory=" + temp_dir, str(temp_tex)],
         ]
-        
-        compilation_success = False
-        error_message = ""
         
         for compiler_cmd in compilers:
             compiler_name = compiler_cmd[0]
             
-            # Check if compiler is available
             if shutil.which(compiler_name) is None:
-                logger.debug(f"{compiler_name} not found, trying next compiler")
                 continue
             
             logger.info(f"Compiling with {compiler_name}...")
             
             try:
-                # Run compiler (may need multiple passes)
                 for _ in range(2):  # Two passes for references
                     result = subprocess.run(
                         compiler_cmd,
@@ -158,27 +180,71 @@ def compile_latex(
                         break
                 
                 if temp_pdf.exists():
-                    # Copy PDF to output directory
                     shutil.copy(temp_pdf, pdf_path)
-                    compilation_success = True
                     logger.info(f"Compiled PDF: {pdf_path}")
-                    break
-                else:
-                    error_message = f"{compiler_name} did not produce PDF. Log: {result.stderr[:500]}"
-                    logger.warning(error_message)
+                    return True, ""
                     
             except subprocess.TimeoutExpired:
-                error_message = f"{compiler_name} compilation timed out"
-                logger.warning(error_message)
+                pass
             except Exception as e:
-                error_message = f"{compiler_name} failed: {e}"
-                logger.warning(error_message)
+                pass
         
-        if not compilation_success:
-            logger.error(f"All compilers failed: {error_message}")
-            return False, None, tex_path, error_message
+        return False, "No local LaTeX compiler found (pdflatex, xelatex, latexmk)"
+
+
+def _try_online_compilation(latex_code: str, pdf_path: Path) -> Tuple[bool, str]:
+    """
+    Compile LaTeX using online API (latex.ytotech.com).
     
-    return True, pdf_path, tex_path, ""
+    This is a free API that compiles LaTeX to PDF without requiring local installation.
+    """
+    import requests
+    
+    # YtoTech LaTeX API (free, no auth required)
+    api_url = "https://latex.ytotech.com/builds/sync"
+    
+    payload = {
+        "compiler": "pdflatex",
+        "resources": [
+            {
+                "main": True,
+                "content": latex_code,
+            }
+        ]
+    }
+    
+    try:
+        logger.info("Sending LaTeX to online compiler...")
+        response = requests.post(
+            api_url,
+            json=payload,
+            timeout=60,
+            headers={"Content-Type": "application/json"}
+        )
+        
+        if response.status_code in (200, 201):
+            # Check if response is PDF (starts with %PDF)
+            if response.content[:4] == b'%PDF':
+                with open(pdf_path, "wb") as f:
+                    f.write(response.content)
+                logger.info(f"Online compilation successful: {pdf_path}")
+                return True, ""
+            else:
+                # Response might be an error message
+                try:
+                    error_data = response.json()
+                    return False, f"API error: {error_data.get('message', 'Unknown error')}"
+                except:
+                    return False, "API returned non-PDF response"
+        else:
+            return False, f"API returned status {response.status_code}: {response.text[:200]}"
+            
+    except requests.Timeout:
+        return False, "Online API timed out"
+    except requests.RequestException as e:
+        return False, f"Online API request failed: {e}"
+    except Exception as e:
+        return False, f"Online compilation error: {e}"
 
 
 def compile_latex_node(state: WorkflowState) -> dict[str, Any]:
