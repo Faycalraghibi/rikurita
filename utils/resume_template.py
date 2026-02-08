@@ -276,11 +276,16 @@ def generate_resume_from_template(
                 latex += r"  \item " + escape_latex(cert) + "\n"
         latex += r"\end{itemize}" + "\n\n"
 
-    # Experience
+    # Experience (with tailored bullets when available)
+    tailored_exp = (
+        customizations.get("tailored_experience", {}) if customizations else {}
+    )
+
     if experience:
         latex += r"\section{Experience}" + "\n"
         for exp in experience:
-            company = escape_latex(exp.get("company", ""))
+            company_raw = exp.get("company", "")
+            company = escape_latex(company_raw)
             role = escape_latex(exp.get("role", exp.get("title", "")))
             dates = escape_latex(exp.get("dates", ""))
             loc = escape_latex(exp.get("location", ""))
@@ -298,7 +303,12 @@ def generate_resume_from_template(
                 + "\n"
             )
 
-            highlights = exp.get("achievements", exp.get("highlights", []))
+            # Use tailored bullets if available, otherwise use original
+            if company_raw in tailored_exp:
+                highlights = tailored_exp[company_raw]
+            else:
+                highlights = exp.get("achievements", exp.get("highlights", []))
+
             if highlights:
                 latex += r"\begin{itemize}" + "\n"
                 for highlight in highlights[:4]:
@@ -306,16 +316,26 @@ def generate_resume_from_template(
                 latex += r"\end{itemize}" + "\n"
         latex += "\n"
 
-    # Projects (reordered based on customizations)
+    # Projects (reordered and with tailored bullets when available)
+    tailored_proj = (
+        customizations.get("tailored_projects", {}) if customizations else {}
+    )
+
     if projects:
         latex += r"\section{Projects}" + "\n"
         for proj in projects[:4]:
-            proj_name = escape_latex(proj.get("name", ""))
+            proj_name_raw = proj.get("name", "")
+            proj_name = escape_latex(proj_name_raw)
             tech = escape_latex(proj.get("technologies", ""))
 
             latex += r"\resumeProject{" + proj_name + r"}{" + tech + r"}" + "\n"
 
-            achievements = proj.get("achievements", proj.get("description", []))
+            # Use tailored bullets if available, otherwise use original
+            if proj_name_raw in tailored_proj:
+                achievements = tailored_proj[proj_name_raw]
+            else:
+                achievements = proj.get("achievements", proj.get("description", []))
+
             if isinstance(achievements, list) and achievements:
                 latex += r"\begin{itemize}" + "\n"
                 for ach in achievements[:3]:

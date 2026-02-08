@@ -2,11 +2,12 @@
 Resume Generator Node
 
 Generates customized LaTeX resumes for relevant jobs.
-Uses template-based approach with LLM-driven content selection.
+Uses LLM to tailor content (bullet points, emphasis) based on job requirements.
 """
 
 import json
 import logging
+import time
 from typing import Any
 
 from graph.state import WorkflowState
@@ -15,12 +16,15 @@ from utils.resume_template import generate_resume_from_template
 
 logger = logging.getLogger(__name__)
 
+# Delay between LLM calls to avoid rate limiting (seconds)
+LLM_CALL_DELAY = 3.0
+
 
 def generate_resume_node(state: WorkflowState) -> dict[str, Any]:
     """
     Generate a customized LaTeX resume for the current job.
 
-    Uses LLM to select and reorder content based on job requirements,
+    Uses LLM to tailor content based on job requirements,
     then template-based generation for reliable LaTeX output.
 
     Args:
@@ -60,7 +64,7 @@ def generate_resume_node(state: WorkflowState) -> dict[str, Any]:
         customizations = None
         try:
             client = OpenRouterClient()
-            customizations = _get_job_tailoring(
+            customizations = _get_full_tailoring(
                 client,
                 resume_data,
                 job_title,
@@ -70,10 +74,11 @@ def generate_resume_node(state: WorkflowState) -> dict[str, Any]:
             )
             if customizations:
                 logger.info(
-                    f"LLM tailoring: prioritizing {customizations.get('top_projects', [])}"
+                    f"LLM tailoring: {customizations.get('tailoring_summary', 'N/A')}"
                 )
         except Exception as e:
-            logger.warning(f"LLM tailoring failed, using default order: {e}")
+            logger.warning(f"LLM tailoring failed, using job-type defaults: {e}")
+            customizations = _get_job_type_tailoring(job_title)
 
         # Generate resume using template with customizations
         latex_code = generate_resume_from_template(
@@ -111,7 +116,7 @@ def generate_resume_node(state: WorkflowState) -> dict[str, Any]:
         }
 
 
-def _get_job_tailoring(
+def _get_full_tailoring(
     client: OpenRouterClient,
     resume_data: dict,
     job_title: str,
@@ -120,64 +125,116 @@ def _get_job_tailoring(
     matching_points: list,
 ) -> dict | None:
     """
-    Use LLM to determine how to tailor the resume for this specific job.
+    Use LLM to generate fully tailored resume content.
+
+    This rewrites bullet points, selects relevant achievements,
+    and creates a targeted professional summary.
 
     Returns:
-        Dictionary with tailoring instructions:
-        - top_projects: list of project names to prioritize (in order)
-        - top_skills: list of skills to list first
-        - experience_order: list of company names in display order
-        - professional_summary: optional 1-2 sentence tailored summary
+        Dictionary with:
+        - professional_focus: tailored headline for this role
+        - tailored_experience: dict of company -> list of rewritten bullets
+        - tailored_projects: dict of project -> list of rewritten bullets
+        - top_skills: list of skills to highlight first
+        - top_projects: list of project names in priority order
     """
-    # Build context about the candidate
+    # Build resume context
     projects = resume_data.get("projects", [])
-    project_names = [p.get("name", "") for p in projects]
-
     experience = resume_data.get("experience", [])
-    exp_companies = [e.get("company", "") for e in experience]
-
     skills = resume_data.get("skills", {})
+
     all_skills = (
         skills.get("programming_languages", [])
         + skills.get("frameworks_libraries", skills.get("frameworks", []))
         + skills.get("other_skills", skills.get("domains", []))
     )
 
-    # Create prompt for the LLM
-    system_prompt = """You are a career coach helping tailor a resume for a specific job.
-Given the job and candidate information, decide:
-1. Which projects are most relevant (order them by relevance)
-2. Which skills to highlight first
-3. A brief 1-sentence professional focus for this role
+    # Build detailed prompt
+    system_prompt = """You are an expert resume tailoring assistant.
+Your job is to REWRITE resume bullet points to emphasize skills and achievements
+that are most relevant to the specific job the candidate is applying for.
 
-Return ONLY valid JSON with this exact structure:
+You must:
+1. Rewrite experience bullet points to emphasize relevant keywords and skills
+2. Rewrite project descriptions to highlight relevant technologies
+3. Create a compelling 1-line professional summary for this specific role
+4. Select which skills to list first
+
+Return ONLY valid JSON with this structure:
 {
-    "top_projects": ["project1", "project2"],
-    "top_skills": ["skill1", "skill2", "skill3", "skill4", "skill5"],
-    "professional_focus": "Brief sentence about candidate's fit for this role"
+    "professional_focus": "One compelling sentence about candidate's fit",
+    "tailored_experience": {
+        "Company Name": [
+            "Rewritten bullet 1 emphasizing relevant skills",
+            "Rewritten bullet 2 with job-specific keywords"
+        ]
+    },
+    "tailored_projects": {
+        "Project Name": [
+            "Rewritten achievement emphasizing relevant tech"
+        ]
+    },
+    "top_skills": ["skill1", "skill2", "skill3"],
+    "top_projects": ["Project1", "Project2"],
+    "tailoring_summary": "Brief note on what was emphasized"
 }
 
-Return ONLY the JSON, no other text."""
+Return ONLY JSON, no other text."""
 
     # Build job context
-    job_context = f"Job: {job_title} at {company_name}"
+    job_context = f"TARGET JOB: {job_title} at {company_name}"
     if description:
-        job_context += f"\n\nJob Description:\n{description[:800]}"
+        job_context += f"\n\nJob Description:\n{description[:1000]}"
+    else:
+        job_context += "\n\n(No job description available - tailor based on job title)"
     if matching_points:
-        job_context += f"\n\nMatching points: {', '.join(matching_points[:5])}"
+        job_context += f"\n\nMatching keywords: {', '.join(matching_points[:5])}"
+
+    # Build resume context
+    exp_text = ""
+    for exp in experience:
+        company = exp.get("company", "")
+        role = exp.get("role", exp.get("title", ""))
+        bullets = exp.get("achievements", exp.get("highlights", []))
+        exp_text += f"\n{role} at {company}:\n"
+        for b in bullets:
+            exp_text += f"  - {b}\n"
+
+    proj_text = ""
+    for proj in projects:
+        name = proj.get("name", "")
+        tech = proj.get("technologies", "")
+        bullets = proj.get("achievements", proj.get("description", []))
+        proj_text += f"\n{name} ({tech}):\n"
+        if isinstance(bullets, list):
+            for b in bullets:
+                proj_text += f"  - {b}\n"
+        else:
+            proj_text += f"  - {bullets}\n"
 
     prompt = f"""{job_context}
 
-Candidate's projects: {", ".join(project_names)}
-Candidate's skills: {", ".join(all_skills[:15])}
-Experience companies: {", ".join(exp_companies)}
+CANDIDATE'S CURRENT RESUME:
 
-Which projects and skills are most relevant for this {job_title} role?"""
+EXPERIENCE:
+{exp_text}
+
+PROJECTS:
+{proj_text}
+
+SKILLS: {", ".join(all_skills[:15])}
+
+Rewrite the bullet points to better match this {job_title} position.
+Emphasize relevant technologies, skills, and achievements.
+Keep the core facts accurate but adjust the language and emphasis."""
 
     try:
-        response = client.chat(prompt, system_prompt, max_tokens=400, temperature=0.3)
+        response = client.chat(prompt, system_prompt, max_tokens=1200, temperature=0.4)
 
-        # Clean up response (handle markdown code blocks)
+        # Add delay after LLM call to avoid rate limiting
+        time.sleep(LLM_CALL_DELAY)
+
+        # Clean up response
         response = response.strip()
         if response.startswith("```"):
             parts = response.split("```")
@@ -188,98 +245,188 @@ Which projects and skills are most relevant for this {job_title} role?"""
             response = response.strip()
 
         result = json.loads(response)
-        logger.info(
-            f"Tailoring for {job_title}: focus on {result.get('top_projects', [])[:2]}"
-        )
+        logger.info(f"Full tailoring generated for: {job_title}")
         return result
 
     except json.JSONDecodeError as e:
-        logger.warning(f"Failed to parse LLM response as JSON: {e}")
-        # Fall back to keyword-based tailoring
-        return _keyword_based_tailoring(job_title, resume_data)
+        logger.warning(f"Failed to parse LLM tailoring response: {e}")
+        return _get_job_type_tailoring(job_title)
     except Exception as e:
-        logger.warning(f"LLM tailoring request failed: {e}")
-        return _keyword_based_tailoring(job_title, resume_data)
+        logger.warning(f"LLM tailoring failed: {e}")
+        return _get_job_type_tailoring(job_title)
 
 
-def _keyword_based_tailoring(job_title: str, resume_data: dict) -> dict:
+def _get_job_type_tailoring(job_title: str) -> dict:
     """
-    Generate tailoring based on keyword matching when LLM fails.
+    Generate tailoring based on job type when LLM is unavailable.
 
-    Analyzes the job title and matches against project/skill keywords.
+    Uses predefined templates for common job types.
     """
     job_lower = job_title.lower()
 
-    # Define keyword mappings for different job types
-    keyword_project_map = {
-        # ML/AI roles prioritize Joshu and Juridia
-        "machine learning": ["Joshu", "Juridia"],
-        "ml ": ["Joshu", "Juridia"],
-        "deep learning": ["Juridia", "Joshu"],
-        "ai ": ["Joshu", "LogoCraftAI"],
-        "artificial intelligence": ["Joshu", "LogoCraftAI"],
-        "nlp": ["Juridia", "Joshu"],
-        "recommender": ["Joshu", "Juridia"],
-        "data scien": ["Joshu", "Juridia", "LogoCraftAI"],
-        "data engineer": ["Joshu", "Juridia"],
-        "research": ["Joshu", "Juridia"],
+    # Define different tailoring strategies per job type
+    tailoring_templates = {
+        "machine learning": {
+            "professional_focus": "Machine Learning Engineer with hands-on experience building LLM agents and deep learning systems",
+            "top_projects": [
+                "Joshu",
+                "Juridia's Multilingual Legal Translation",
+                "LogoCraftAI",
+            ],
+            "top_skills": [
+                "Python",
+                "PyTorch",
+                "TensorFlow",
+                "Scikit-learn",
+                "LangGraph",
+            ],
+            "tailored_experience": {
+                "Oracle": [
+                    "Built and stabilized ML agent runtime, improving inference reliability for autonomous reasoning systems",
+                    "Refactored machine learning integration layers, optimizing LLM orchestration patterns",
+                    "Implemented best practices for ML model coordination and tool-use patterns",
+                ],
+            },
+            "tailored_projects": {
+                "Joshu": [
+                    "Designed ML-powered agent platform with autonomous reasoning and persistent memory",
+                    "Built multi-agent ML workflows with coordination between LLM-based agents",
+                ],
+            },
+            "tailoring_summary": "Emphasized ML, deep learning, and LLM experience",
+        },
+        "data scien": {
+            "professional_focus": "Data Science student with strong foundation in ML, statistics, and production AI systems",
+            "top_projects": [
+                "Joshu",
+                "Juridia's Multilingual Legal Translation",
+                "LogoCraftAI",
+            ],
+            "top_skills": ["Python", "Scikit-learn", "SQL", "PyTorch", "TensorFlow"],
+            "tailored_experience": {
+                "Oracle": [
+                    "Analyzed and diagnosed data pipeline failures in agent systems, improving data flow reliability",
+                    "Optimized database integration for ML inference, ensuring consistent data access patterns",
+                    "Created data-driven documentation to accelerate team knowledge transfer",
+                ],
+            },
+            "tailored_projects": {
+                "Joshu": [
+                    "Built data-driven agent platform with semantic memory and context management",
+                    "Designed data pipelines for multi-agent coordination and state persistence",
+                ],
+            },
+            "tailoring_summary": "Emphasized data science, analytics, and statistical skills",
+        },
+        "ai ": {
+            "professional_focus": "AI Engineering student specializing in LLM agents, generative AI, and multi-agent systems",
+            "top_projects": [
+                "Joshu",
+                "LogoCraftAI",
+                "Juridia's Multilingual Legal Translation",
+            ],
+            "top_skills": ["LLM Agents", "Python", "LangGraph", "FastAPI", "PyTorch"],
+            "tailored_experience": {
+                "Oracle": [
+                    "Developed autonomous AI agents with advanced reasoning and tool-use capabilities",
+                    "Built LLM orchestration layer supporting multiple AI model backends",
+                    "Implemented AI best practices for agent coordination and execution patterns",
+                ],
+            },
+            "tailored_projects": {
+                "Joshu": [
+                    "Created AI agent platform with autonomous reasoning and multi-agent coordination",
+                    "Implemented generative AI workflows with persistent semantic memory",
+                ],
+                "LogoCraftAI": [
+                    "Built end-to-end generative AI system from prompt engineering to production deployment",
+                ],
+            },
+            "tailoring_summary": "Emphasized AI, LLM agents, and generative AI experience",
+        },
+        "research": {
+            "professional_focus": "Research-oriented ML engineer with experience in NLP, agent systems, and model fine-tuning",
+            "top_projects": [
+                "Juridia's Multilingual Legal Translation",
+                "Joshu",
+                "LogoCraftAI",
+            ],
+            "top_skills": ["PyTorch", "Hugging Face", "Python", "TensorFlow", "NLP"],
+            "tailored_experience": {
+                "Oracle": [
+                    "Conducted research on agent execution patterns and reasoning reliability",
+                    "Investigated and resolved complex failures in autonomous AI systems",
+                    "Authored technical research documentation on agent orchestration methods",
+                ],
+            },
+            "tailored_projects": {
+                "Juridia's Multilingual Legal Translation": [
+                    "Researched and implemented LoRA fine-tuning for domain-specific NLP models",
+                    "Evaluated model performance using BLEU metrics and comparative analysis",
+                ],
+            },
+            "tailoring_summary": "Emphasized research, NLP, and academic rigor",
+        },
+        "analyst": {
+            "professional_focus": "Data-driven analyst with engineering background in AI/ML and business analytics",
+            "top_projects": [
+                "Joshu",
+                "LogoCraftAI",
+                "Juridia's Multilingual Legal Translation",
+            ],
+            "top_skills": ["Python", "SQL", "Power BI", "Data Analysis", "Excel"],
+            "tailored_experience": {
+                "Oracle": [
+                    "Analyzed system performance data to diagnose and resolve critical issues",
+                    "Created analytical documentation and reports for stakeholder communication",
+                    "Collaborated cross-functionally to improve system reliability metrics",
+                ],
+                "Arrow Electronics": [
+                    "Performed systematic API testing and analysis in agile engineering environment",
+                ],
+            },
+            "tailored_projects": {
+                "Joshu": [
+                    "Analyzed user interaction patterns to optimize agent coordination workflows",
+                ],
+            },
+            "tailoring_summary": "Emphasized analytical skills and data-driven decision making",
+        },
     }
 
-    keyword_skill_map = {
-        "machine learning": ["Python", "PyTorch", "TensorFlow", "Scikit-learn"],
-        "ml ": ["Python", "PyTorch", "TensorFlow", "Scikit-learn"],
-        "deep learning": ["PyTorch", "TensorFlow", "Python"],
-        "ai ": ["LLM Agents", "Python", "LangGraph", "FastAPI"],
-        "nlp": ["Hugging Face", "PyTorch", "Python"],
-        "data scien": ["Python", "Scikit-learn", "SQL", "PyTorch"],
-        "recommender": ["PyTorch", "Python", "Scikit-learn"],
+    # Default fallback - still provides tailored bullets for general tech/business roles
+    default_tailoring = {
+        "professional_focus": "Engineering student with hands-on experience in AI/ML, data science, and software development",
+        "top_projects": [
+            "Joshu",
+            "Juridia's Multilingual Legal Translation",
+            "LogoCraftAI",
+        ],
+        "top_skills": ["Python", "Machine Learning", "FastAPI", "PyTorch", "SQL"],
+        "tailored_experience": {
+            "Oracle": [
+                "Delivered production-ready autonomous agent system, resolving critical execution and inference issues",
+                "Orchestrated database and API integrations for scalable multi-backend coordination",
+                "Established best practices for system architecture and technical documentation",
+            ],
+            "Arrow Electronics": [
+                "Validated enterprise system reliability through comprehensive API testing in agile environment",
+            ],
+        },
+        "tailored_projects": {
+            "Joshu": [
+                "Built production-grade platform orchestrating AI agents with secure APIs and persistent memory",
+                "Implemented end-to-end automation with CI/CD, testing, and cross-platform deployment",
+            ],
+        },
+        "tailoring_summary": "Used default professional profile with tailored bullets",
     }
 
-    # Match keywords
-    top_projects = []
-    top_skills = []
-
-    for keyword, projects in keyword_project_map.items():
+    # Find matching template
+    for keyword, template in tailoring_templates.items():
         if keyword in job_lower:
-            top_projects.extend(projects)
-            break
+            logger.info(f"Using '{keyword}' tailoring template for: {job_title}")
+            return template
 
-    for keyword, skills in keyword_skill_map.items():
-        if keyword in job_lower:
-            top_skills.extend(skills)
-            break
-
-    # Remove duplicates while preserving order
-    top_projects = list(dict.fromkeys(top_projects))
-    top_skills = list(dict.fromkeys(top_skills))
-
-    # Generate professional focus based on job title
-    focus_map = {
-        "machine learning": "Aspiring ML engineer with hands-on experience in LLM agents and deep learning",
-        "data scien": "Data Science engineering student with AI/ML project experience",
-        "ai ": "AI engineering student specializing in LLM agents and generative AI",
-        "research": "Research-oriented engineer with experience in AI systems and NLP",
-        "recommender": "ML engineer with experience in production recommendation systems",
-    }
-
-    professional_focus = None
-    for keyword, focus in focus_map.items():
-        if keyword in job_lower:
-            professional_focus = focus
-            break
-
-    if not professional_focus:
-        professional_focus = (
-            "Data Science & AI Engineering student with hands-on project experience"
-        )
-
-    result = {
-        "top_projects": top_projects[:3] if top_projects else [],
-        "top_skills": top_skills[:5] if top_skills else [],
-        "professional_focus": professional_focus,
-    }
-
-    logger.info(
-        f"Keyword-based tailoring for '{job_title}': {result.get('top_projects', [])}"
-    )
-    return result
+    logger.info(f"Using default tailoring for: {job_title}")
+    return default_tailoring
