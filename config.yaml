@@ -32,7 +32,7 @@ user_profile:
       - "AI/ML"
       - "Finance"
       - "Research"
-    minimum_salary: 0  # Intern positions
+    minimum_salary: 0 # Intern positions
     preferred_locations:
       - "France"
       - "Remote"
@@ -45,20 +45,21 @@ job_search:
   keywords: "machine learning engineer intern"
   location: "france"
   experience_level: "internship"
-  date_posted: "week"  # "day", "week", "month"
+  date_posted: "week" # "day", "week", "month"
   max_jobs_per_run: 50
-  relevance_threshold: 7  # Minimum score to proceed (0-10)
+  relevance_threshold: 7 # Minimum score to proceed (0-10)
+  use_cached_dataset: true # true = use existing dataset, false = run fresh actor search
 
 resume_template:
   base_latex_file: "templates/base_resume.tex"
   style: "modern"
 
 llm_settings:
-  model: "anthropic/claude-3.5-sonnet"  # OpenRouter model identifier
+  model: "anthropic/claude-3.5-sonnet" # OpenRouter model identifier
   max_tokens: 4096
   temperature: 0.3
 
 schedule:
   enabled: false
-  interval: "daily"  # "hourly", "daily", "weekly"
-  time: "09:00"  # For daily/weekly schedules
+  interval: "daily" # "hourly", "daily", "weekly"
+  time: "09:00" # For daily/weekly schedules

@@ -4,13 +4,45 @@ Apify Scraper Node
 Fetches job listings from LinkedIn via Apify API.
 """
 
+import csv
 import logging
+from pathlib import Path
 from typing import Any
 
 from graph.state import WorkflowState
 from utils.apify_client import ApifyJobScraper
 
 logger = logging.getLogger(__name__)
+
+# Path to applications tracking file
+TRACKING_FILE = Path("track/applications.csv")
+
+
+def _load_existing_job_urls() -> set[str]:
+    """
+    Load existing job URLs from applications.csv.
+
+    Returns:
+        Set of job post links that have already been processed.
+    """
+    existing_urls = set()
+
+    if not TRACKING_FILE.exists():
+        logger.info("No existing applications.csv - all jobs are new")
+        return existing_urls
+
+    try:
+        with open(TRACKING_FILE, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                job_link = row.get("Job Post Link", "")
+                if job_link:
+                    existing_urls.add(job_link)
+        logger.info(f"Loaded {len(existing_urls)} existing job URLs for deduplication")
+    except Exception as e:
+        logger.warning(f"Failed to load existing applications: {e}")
+
+    return existing_urls
 
 
 def fetch_jobs_node(state: WorkflowState) -> dict[str, Any]:
@@ -45,6 +77,20 @@ def fetch_jobs_node(state: WorkflowState) -> dict[str, Any]:
             "workflow_complete": True,
         }
 
+    # Load existing job URLs for deduplication
+    existing_urls = _load_existing_job_urls()
+
+    # Check if using cached dataset or running fresh search
+    use_cached_dataset = job_search.get("use_cached_dataset", False)
+    if use_cached_dataset:
+        logger.info(
+            "Mode: Using cached dataset (set use_cached_dataset: false to run fresh search)"
+        )
+    else:
+        logger.info(
+            "Mode: Running fresh actor search (requires paid Apify subscription)"
+        )
+
     try:
         scraper = ApifyJobScraper()
         jobs = scraper.fetch_jobs(
@@ -53,15 +99,28 @@ def fetch_jobs_node(state: WorkflowState) -> dict[str, Any]:
             experience_level=experience_level,
             date_posted=date_posted,
             max_jobs=max_jobs,
+            use_cached_dataset=use_cached_dataset,
         )
 
         # Convert JobListing objects to dicts
         job_dicts = [job.to_dict() for job in jobs]
 
-        logger.info(f"Fetched {len(job_dicts)} jobs from LinkedIn")
+        # Filter out already-processed jobs
+        original_count = len(job_dicts)
+        job_dicts = [
+            job
+            for job in job_dicts
+            if job.get("job_post_link", "") not in existing_urls
+        ]
+        skipped_count = original_count - len(job_dicts)
+
+        if skipped_count > 0:
+            logger.info(f"Skipped {skipped_count} already-processed jobs")
+
+        logger.info(f"Found {len(job_dicts)} new jobs to process")
 
         if not job_dicts:
-            logger.warning("No jobs found matching search criteria")
+            logger.warning("No new jobs found matching search criteria")
             return {
                 "all_jobs": [],
                 "total_jobs": 0,

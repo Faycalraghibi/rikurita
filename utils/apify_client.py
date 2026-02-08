@@ -155,6 +155,70 @@ class ApifyJobScraper:
             logger.error(f"Failed to fetch from dataset: {e}")
             raise
 
+    def run_actor_sync(
+        self,
+        actor_input: dict,
+        timeout_secs: int = 300,
+    ) -> list[JobListing]:
+        """
+        Run actor synchronously via REST API and return dataset items.
+
+        Uses /acts/:actorId/run-sync-get-dataset-items endpoint which runs
+        the actor and returns the results in a single request.
+
+        Args:
+            actor_input: Input configuration for the actor.
+            timeout_secs: Maximum time to wait for actor completion.
+
+        Returns:
+            List of JobListing objects.
+        """
+        url = f"{self.API_BASE}/acts/{self.ACTOR_ID.replace('/', '~')}/run-sync-get-dataset-items"
+        params = {
+            "token": self.api_token,
+            "timeout": timeout_secs,
+        }
+        headers = {
+            "Content-Type": "application/json",
+        }
+
+        logger.info(f"Running actor synchronously: {self.ACTOR_ID}")
+        logger.info(f"Input: {actor_input}")
+
+        try:
+            response = requests.post(
+                url,
+                json=actor_input,
+                params=params,
+                headers=headers,
+                timeout=timeout_secs + 30,  # Extra buffer for network
+            )
+            response.raise_for_status()
+
+            items = response.json()
+            logger.info(f"Actor completed - fetched {len(items)} items")
+
+            # Parse results into JobListing objects
+            jobs = []
+            for item in items:
+                try:
+                    job = self._parse_job_item(item)
+                    jobs.append(job)
+                except Exception as e:
+                    logger.warning(f"Failed to parse job item: {e}")
+                    continue
+
+            return jobs
+
+        except requests.exceptions.Timeout:
+            logger.error("Actor run timed out")
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Actor run failed: {e}")
+            if hasattr(e, "response") and e.response is not None:
+                logger.error(f"Response: {e.response.text[:500]}")
+            raise
+
     def fetch_jobs(
         self,
         keywords: str,
@@ -162,9 +226,10 @@ class ApifyJobScraper:
         experience_level: str = "",
         date_posted: str = "week",
         max_jobs: int = 50,
+        use_cached_dataset: bool = False,
     ) -> list[JobListing]:
         """
-        Fetch job listings - uses dataset if available, otherwise runs actor.
+        Fetch job listings - runs actor by default, or uses cached dataset.
 
         Args:
             keywords: Job search keywords (e.g., "machine learning engineer").
@@ -172,18 +237,19 @@ class ApifyJobScraper:
             experience_level: Experience level filter ("internship", "entry", "mid", "senior").
             date_posted: Date filter ("day", "week", "month").
             max_jobs: Maximum number of jobs to fetch.
+            use_cached_dataset: If True, fetch from cached dataset instead of running actor.
 
         Returns:
             List of JobListing objects.
         """
-        # If dataset ID is configured, fetch from dataset instead
-        if self.dataset_id:
-            logger.info(f"Using existing dataset: {self.dataset_id}")
+        # If cached dataset mode and dataset ID is configured
+        if use_cached_dataset and self.dataset_id:
+            logger.info(f"Using cached dataset: {self.dataset_id}")
             return self.fetch_from_dataset(max_jobs=max_jobs)
 
-        # Otherwise, try to run the actor
+        # Run fresh actor search
         logger.info(
-            f"Fetching jobs: keywords='{keywords}', location='{location}', max={max_jobs}"
+            f"Running fresh search: keywords='{keywords}', location='{location}', max={max_jobs}"
         )
 
         # Map experience level to LinkedIn format
@@ -222,33 +288,8 @@ class ApifyJobScraper:
         if date_posted and date_posted.lower() in date_map:
             run_input["publishedAt"] = date_map[date_posted.lower()]
 
-        try:
-            # Run the Actor and wait for it to finish
-            logger.info("Starting Apify actor run...")
-            run = self.client.actor(self.ACTOR_ID).call(run_input=run_input)
-
-            # Fetch results from the run's dataset
-            dataset_items = list(
-                self.client.dataset(run["defaultDatasetId"]).iterate_items()
-            )
-
-            logger.info(f"Fetched {len(dataset_items)} job listings from Apify")
-
-            # Parse results into JobListing objects
-            jobs = []
-            for item in dataset_items:
-                try:
-                    job = self._parse_job_item(item)
-                    jobs.append(job)
-                except Exception as e:
-                    logger.warning(f"Failed to parse job item: {e}")
-                    continue
-
-            return jobs
-
-        except Exception as e:
-            logger.error(f"Failed to fetch jobs from Apify: {e}")
-            raise
+        # Use REST API to run actor synchronously
+        return self.run_actor_sync(run_input)
 
     def _parse_job_item(self, item: dict) -> JobListing:
         """

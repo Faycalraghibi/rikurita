@@ -114,21 +114,22 @@ def check_relevance_node(state: WorkflowState) -> dict[str, Any]:
                 + (0 if is_relevant else 1),
             }
         elif matching_roles:
-            # Only role match without core keywords - lower score
-            score = 5
-            logger.info(f"Partial role match only: {matching_roles} (score: {score})")
+            # Role match - give passing score to process the job
+            score = 7
+            is_relevant = True
+            logger.info(f"Role match found: {matching_roles} (score: {score})")
 
             return {
                 "relevance_result": {
                     "score": score,
-                    "reasoning": f"Role match but missing technical keywords: {', '.join(matching_roles)}",
+                    "reasoning": f"Match: {', '.join(matching_roles)}",
                     "matching_points": matching_roles,
                     "missing_requirements": [
-                        "Core ML/Data keywords not found in title"
+                        "Core ML/Data keywords not found in title but role matches"
                     ],
                 },
-                "is_relevant": False,
-                "jobs_skipped": state.get("jobs_skipped", 0) + 1,
+                "is_relevant": True,
+                "jobs_relevant": state.get("jobs_relevant", 0) + 1,
             }
         else:
             logger.info(f"Title '{job_title}' doesn't match ML/Data criteria")
