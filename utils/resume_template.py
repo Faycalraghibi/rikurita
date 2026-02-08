@@ -13,12 +13,9 @@ def escape_latex(text) -> str:
     """Escape special LaTeX characters."""
     if text is None:
         return ""
-
-    # Handle non-string types
     if not isinstance(text, str):
         text = str(text)
 
-    # Characters that need escaping in LaTeX
     replacements = [
         ("\\", r"\textbackslash{}"),
         ("&", r"\&"),
@@ -47,14 +44,12 @@ def _reorder_by_priority(
 
     priority_lower = [p.lower() for p in priority_names]
 
-    # Separate into prioritized and other items
     prioritized = []
     other = []
 
     for item in items:
         item_name = item.get(name_key, "").lower()
 
-        # Check if item matches any priority name
         matched = False
         for i, pname in enumerate(priority_lower):
             if pname in item_name or item_name in pname:
@@ -65,7 +60,6 @@ def _reorder_by_priority(
         if not matched:
             other.append(item)
 
-    # Sort prioritized by their position in the priority list
     prioritized.sort(key=lambda x: x[0])
 
     return [item for _, item in prioritized] + other
@@ -112,29 +106,20 @@ def generate_resume_from_template(
     Returns:
         Complete LaTeX code.
     """
-    # Handle different key names for personal info
     personal = resume_data.get("personal", resume_data.get("personal_info", {}))
     education = resume_data.get("education", [])
     experience = resume_data.get("experience", [])
-    projects = list(resume_data.get("projects", []))  # Copy to avoid mutating original
+    projects = list(resume_data.get("projects", []))
     skills = resume_data.get("skills", {})
     certifications = resume_data.get("certifications", [])
     extracurricular = resume_data.get("extracurricular", [])
-
-    # Apply customizations
     professional_focus = None
     if customizations:
-        # Reorder projects based on LLM recommendations
         top_projects = customizations.get("top_projects", [])
         if top_projects:
             projects = _reorder_by_priority(projects, top_projects, "name")
-
-        # Get professional focus for header
         professional_focus = customizations.get("professional_focus")
 
-        # Note: top_skills will be used in skills section below
-
-    # Build LaTeX document
     latex = r"""\documentclass[11pt,a4paper]{article}
 
 \usepackage[utf8]{inputenc}
@@ -159,10 +144,10 @@ def generate_resume_from_template(
 
 % Custom commands
 \newcommand{\resumeSubheading}[4]{
-  \vspace{3pt}
+  \vspace{4pt}
   \noindent\textbf{#1} \hfill #2 \\
   \textit{#3} \hfill \textit{#4}
-  \vspace{2pt}
+  \par\vspace{2pt}
 }
 
 \newcommand{\resumeProject}[2]{

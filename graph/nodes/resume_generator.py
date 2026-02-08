@@ -77,8 +77,9 @@ def generate_resume_node(state: WorkflowState) -> dict[str, Any]:
                     f"LLM tailoring: {customizations.get('tailoring_summary', 'N/A')}"
                 )
         except Exception as e:
-            logger.warning(f"LLM tailoring failed, using job-type defaults: {e}")
-            customizations = _get_job_type_tailoring(job_title)
+            logger.warning(f"LLM tailoring failed: {e}")
+            logger.info("Using fallback: original resume content (no LLM tailoring)")
+            customizations = None
 
         # Generate resume using template with customizations
         latex_code = generate_resume_from_template(
@@ -250,183 +251,43 @@ Keep the core facts accurate but adjust the language and emphasis."""
 
     except json.JSONDecodeError as e:
         logger.warning(f"Failed to parse LLM tailoring response: {e}")
-        return _get_job_type_tailoring(job_title)
+        return _get_fallback_customization(resume_data)
     except Exception as e:
         logger.warning(f"LLM tailoring failed: {e}")
-        return _get_job_type_tailoring(job_title)
+        return _get_fallback_customization(resume_data)
 
 
-def _get_job_type_tailoring(job_title: str) -> dict:
+def _get_fallback_customization(resume_data: dict) -> dict:
     """
-    Generate tailoring based on job type when LLM is unavailable.
+    Generate minimal customizations when LLM is unavailable.
 
-    Uses predefined templates for common job types.
+    This does NOT modify any content - it simply passes through
+    the original resume data. The template will use the original
+    experience bullets, project descriptions, etc.
+
+    This is intentionally minimal to keep the tool general-purpose.
+    All actual tailoring should come from the LLM.
+
+    Args:
+        resume_data: The user's resume data from YAML.
+
+    Returns:
+        Dictionary with empty tailoring (use original content).
     """
-    job_lower = job_title.lower()
+    # Get user's professional title from resume_data if available
+    personal = resume_data.get("personal", resume_data.get("personal_info", {}))
+    professional_focus = personal.get("title", None)
 
-    # Define different tailoring strategies per job type
-    tailoring_templates = {
-        "machine learning": {
-            "professional_focus": "Machine Learning Engineer with hands-on experience building LLM agents and deep learning systems",
-            "top_projects": [
-                "Joshu",
-                "Juridia's Multilingual Legal Translation",
-                "LogoCraftAI",
-            ],
-            "top_skills": [
-                "Python",
-                "PyTorch",
-                "TensorFlow",
-                "Scikit-learn",
-                "LangGraph",
-            ],
-            "tailored_experience": {
-                "Oracle": [
-                    "Built and stabilized ML agent runtime, improving inference reliability for autonomous reasoning systems",
-                    "Refactored machine learning integration layers, optimizing LLM orchestration patterns",
-                    "Implemented best practices for ML model coordination and tool-use patterns",
-                ],
-            },
-            "tailored_projects": {
-                "Joshu": [
-                    "Designed ML-powered agent platform with autonomous reasoning and persistent memory",
-                    "Built multi-agent ML workflows with coordination between LLM-based agents",
-                ],
-            },
-            "tailoring_summary": "Emphasized ML, deep learning, and LLM experience",
-        },
-        "data scien": {
-            "professional_focus": "Data Science student with strong foundation in ML, statistics, and production AI systems",
-            "top_projects": [
-                "Joshu",
-                "Juridia's Multilingual Legal Translation",
-                "LogoCraftAI",
-            ],
-            "top_skills": ["Python", "Scikit-learn", "SQL", "PyTorch", "TensorFlow"],
-            "tailored_experience": {
-                "Oracle": [
-                    "Analyzed and diagnosed data pipeline failures in agent systems, improving data flow reliability",
-                    "Optimized database integration for ML inference, ensuring consistent data access patterns",
-                    "Created data-driven documentation to accelerate team knowledge transfer",
-                ],
-            },
-            "tailored_projects": {
-                "Joshu": [
-                    "Built data-driven agent platform with semantic memory and context management",
-                    "Designed data pipelines for multi-agent coordination and state persistence",
-                ],
-            },
-            "tailoring_summary": "Emphasized data science, analytics, and statistical skills",
-        },
-        "ai ": {
-            "professional_focus": "AI Engineering student specializing in LLM agents, generative AI, and multi-agent systems",
-            "top_projects": [
-                "Joshu",
-                "LogoCraftAI",
-                "Juridia's Multilingual Legal Translation",
-            ],
-            "top_skills": ["LLM Agents", "Python", "LangGraph", "FastAPI", "PyTorch"],
-            "tailored_experience": {
-                "Oracle": [
-                    "Developed autonomous AI agents with advanced reasoning and tool-use capabilities",
-                    "Built LLM orchestration layer supporting multiple AI model backends",
-                    "Implemented AI best practices for agent coordination and execution patterns",
-                ],
-            },
-            "tailored_projects": {
-                "Joshu": [
-                    "Created AI agent platform with autonomous reasoning and multi-agent coordination",
-                    "Implemented generative AI workflows with persistent semantic memory",
-                ],
-                "LogoCraftAI": [
-                    "Built end-to-end generative AI system from prompt engineering to production deployment",
-                ],
-            },
-            "tailoring_summary": "Emphasized AI, LLM agents, and generative AI experience",
-        },
-        "research": {
-            "professional_focus": "Research-oriented ML engineer with experience in NLP, agent systems, and model fine-tuning",
-            "top_projects": [
-                "Juridia's Multilingual Legal Translation",
-                "Joshu",
-                "LogoCraftAI",
-            ],
-            "top_skills": ["PyTorch", "Hugging Face", "Python", "TensorFlow", "NLP"],
-            "tailored_experience": {
-                "Oracle": [
-                    "Conducted research on agent execution patterns and reasoning reliability",
-                    "Investigated and resolved complex failures in autonomous AI systems",
-                    "Authored technical research documentation on agent orchestration methods",
-                ],
-            },
-            "tailored_projects": {
-                "Juridia's Multilingual Legal Translation": [
-                    "Researched and implemented LoRA fine-tuning for domain-specific NLP models",
-                    "Evaluated model performance using BLEU metrics and comparative analysis",
-                ],
-            },
-            "tailoring_summary": "Emphasized research, NLP, and academic rigor",
-        },
-        "analyst": {
-            "professional_focus": "Data-driven analyst with engineering background in AI/ML and business analytics",
-            "top_projects": [
-                "Joshu",
-                "LogoCraftAI",
-                "Juridia's Multilingual Legal Translation",
-            ],
-            "top_skills": ["Python", "SQL", "Power BI", "Data Analysis", "Excel"],
-            "tailored_experience": {
-                "Oracle": [
-                    "Analyzed system performance data to diagnose and resolve critical issues",
-                    "Created analytical documentation and reports for stakeholder communication",
-                    "Collaborated cross-functionally to improve system reliability metrics",
-                ],
-                "Arrow Electronics": [
-                    "Performed systematic API testing and analysis in agile engineering environment",
-                ],
-            },
-            "tailored_projects": {
-                "Joshu": [
-                    "Analyzed user interaction patterns to optimize agent coordination workflows",
-                ],
-            },
-            "tailoring_summary": "Emphasized analytical skills and data-driven decision making",
-        },
+    # Build minimal result - all tailoring fields empty
+    # The template will use original content from resume_data
+    result = {
+        "professional_focus": professional_focus,  # From user's data or None
+        "top_projects": [],  # Empty = keep original order
+        "top_skills": [],  # Empty = keep original order
+        "tailored_experience": {},  # Empty = use original bullets
+        "tailored_projects": {},  # Empty = use original bullets
+        "tailoring_summary": "Using original resume (LLM unavailable)",
     }
 
-    # Default fallback - still provides tailored bullets for general tech/business roles
-    default_tailoring = {
-        "professional_focus": "Engineering student with hands-on experience in AI/ML, data science, and software development",
-        "top_projects": [
-            "Joshu",
-            "Juridia's Multilingual Legal Translation",
-            "LogoCraftAI",
-        ],
-        "top_skills": ["Python", "Machine Learning", "FastAPI", "PyTorch", "SQL"],
-        "tailored_experience": {
-            "Oracle": [
-                "Delivered production-ready autonomous agent system, resolving critical execution and inference issues",
-                "Orchestrated database and API integrations for scalable multi-backend coordination",
-                "Established best practices for system architecture and technical documentation",
-            ],
-            "Arrow Electronics": [
-                "Validated enterprise system reliability through comprehensive API testing in agile environment",
-            ],
-        },
-        "tailored_projects": {
-            "Joshu": [
-                "Built production-grade platform orchestrating AI agents with secure APIs and persistent memory",
-                "Implemented end-to-end automation with CI/CD, testing, and cross-platform deployment",
-            ],
-        },
-        "tailoring_summary": "Used default professional profile with tailored bullets",
-    }
-
-    # Find matching template
-    for keyword, template in tailoring_templates.items():
-        if keyword in job_lower:
-            logger.info(f"Using '{keyword}' tailoring template for: {job_title}")
-            return template
-
-    logger.info(f"Using default tailoring for: {job_title}")
-    return default_tailoring
+    logger.info("Using fallback: original resume content (no LLM tailoring)")
+    return result

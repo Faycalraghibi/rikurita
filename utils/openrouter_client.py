@@ -1,7 +1,11 @@
 """
-OpenRouter API Client
+LLM API Client with Multi-Endpoint Router
 
-Wrapper for OpenRouter API supporting multiple LLM models with retry logic.
+Supports multiple LLM endpoints with automatic failover:
+- Primary: LLM_BASE_URL (e.g., LM Studio local)
+- Fallback: LLM_BASE_URL_FALLBACK (e.g., OpenRouter cloud)
+
+Tries primary first, falls back to secondary if unavailable.
 """
 
 import logging
@@ -17,45 +21,152 @@ logger = logging.getLogger(__name__)
 
 
 class OpenRouterClient:
-    """Client for interacting with OpenRouter API."""
-
-    BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
+    """Client for interacting with LLM APIs with multi-endpoint routing."""
 
     def __init__(
         self,
-        api_key: str | None = None,
-        model: str | None = None,
-        max_retries: int = 3,
+        max_retries: int = 2,
         base_delay: float = 1.0,
     ):
         """
-        Initialize OpenRouter client.
+        Initialize LLM API client with multi-endpoint support.
+
+        Environment variables:
+            LLM_BASE_URL: Primary endpoint (e.g., http://localhost:1234/v1/chat/completions)
+            LLM_MODEL: Model for primary endpoint
+            LLM_BASE_URL_FALLBACK: Fallback endpoint (e.g., https://openrouter.ai/api/v1/chat/completions)
+            LLM_MODEL_FALLBACK: Model for fallback endpoint
+            OPENROUTER_API_KEY: API key (required for OpenRouter)
 
         Args:
-            api_key: OpenRouter API key. Defaults to OPENROUTER_API_KEY env var.
-            model: Model identifier to use for requests.
-            max_retries: Maximum number of retry attempts for failed requests.
+            max_retries: Retries per endpoint before moving to next.
             base_delay: Base delay in seconds for exponential backoff.
         """
-        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
-        if not self.api_key:
-            raise ValueError(
-                "OpenRouter API key is required. Set OPENROUTER_API_KEY environment variable."
-            )
-
-        # Use model from parameter, env variable, or default
-        self.model = model or os.getenv(
-            "OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet"
-        )
         self.max_retries = max_retries
         self.base_delay = base_delay
+        self.api_key = os.getenv("OPENROUTER_API_KEY", "")
 
-        self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/rikurita",
-            "X-Title": "Rikurita Job Application System",
-        }
+        # Build list of endpoints to try
+        self.endpoints = []
+
+        # Primary endpoint
+        primary_url = os.getenv("LLM_BASE_URL")
+        if primary_url:
+            self.endpoints.append(
+                {
+                    "url": primary_url,
+                    "model": os.getenv("LLM_MODEL", "local-model"),
+                    "name": "primary",
+                }
+            )
+
+        # Fallback endpoint
+        fallback_url = os.getenv("LLM_BASE_URL_FALLBACK")
+        if fallback_url:
+            self.endpoints.append(
+                {
+                    "url": fallback_url,
+                    "model": os.getenv(
+                        "LLM_MODEL_FALLBACK",
+                        os.getenv("OPENROUTER_MODEL", "anthropic/claude-3-haiku"),
+                    ),
+                    "name": "fallback",
+                }
+            )
+
+        if not self.endpoints:
+            raise ValueError(
+                "At least one LLM endpoint is required. Set LLM_BASE_URL or LLM_BASE_URL_FALLBACK. "
+                "Examples: http://localhost:1234/v1/chat/completions (LM Studio), "
+                "https://openrouter.ai/api/v1/chat/completions (OpenRouter)"
+            )
+
+        # Validate OpenRouter endpoints have API key
+        for ep in self.endpoints:
+            if "openrouter.ai" in ep["url"] and not self.api_key:
+                raise ValueError(
+                    f"OpenRouter API key required for {ep['name']} endpoint. "
+                    "Set OPENROUTER_API_KEY environment variable."
+                )
+
+        logger.info(
+            f"LLM Router configured with {len(self.endpoints)} endpoint(s): "
+            f"{[ep['name'] for ep in self.endpoints]}"
+        )
+
+    def _extract_content(self, response: dict) -> str:
+        """
+        Extract content from various API response formats.
+
+        Different models may return responses in different structures.
+        This method handles the most common formats.
+
+        Args:
+            response: The raw API response dictionary.
+
+        Returns:
+            The extracted content string.
+
+        Raises:
+            KeyError: If no recognized content format is found.
+            RuntimeError: If the API returned an error.
+        """
+        # Check for API errors first
+        if "error" in response:
+            error_msg = response.get("error", {})
+            if isinstance(error_msg, dict):
+                error_text = error_msg.get("message", str(error_msg))
+            else:
+                error_text = str(error_msg)
+            logger.error(f"API returned error: {error_text}")
+            raise RuntimeError(f"API error: {error_text}")
+
+        # Standard OpenAI format: choices[0].message.content
+        if "choices" in response and response["choices"]:
+            choice = response["choices"][0]
+            if "message" in choice and "content" in choice["message"]:
+                return choice["message"]["content"]
+            if "text" in choice:
+                return choice["text"]
+
+        # Direct content field (some models)
+        if "content" in response:
+            return response["content"]
+
+        # Text field (some completions APIs)
+        if "text" in response:
+            return response["text"]
+
+        # Response field (some alternative APIs)
+        if "response" in response:
+            return response["response"]
+
+        # Output field (some models use this)
+        if "output" in response:
+            return response["output"]
+
+        # Log available keys for debugging
+        logger.error(
+            f"Unknown response format. Available keys: {list(response.keys())}"
+        )
+        raise KeyError(
+            f"Could not extract content from response: {list(response.keys())}"
+        )
+
+    def _get_headers(self, endpoint: dict) -> dict:
+        """Build headers for a specific endpoint."""
+        headers = {"Content-Type": "application/json"}
+
+        # Add auth for OpenRouter or if API key is set
+        if self.api_key and "openrouter.ai" in endpoint["url"]:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers["HTTP-Referer"] = "https://github.com/rikurita"
+            headers["X-Title"] = "Rikurita Job Application System"
+        elif self.api_key:
+            # Some local APIs also accept Bearer tokens
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        return headers
 
     def _make_request(
         self,
@@ -64,7 +175,10 @@ class OpenRouterClient:
         temperature: float = 0.3,
     ) -> dict:
         """
-        Make a request to OpenRouter API with retry logic.
+        Make a request with multi-endpoint routing.
+
+        Tries each endpoint in order (primary, then fallback).
+        Each endpoint gets `max_retries` attempts before moving to next.
 
         Args:
             messages: List of message dictionaries with role and content.
@@ -75,39 +189,56 @@ class OpenRouterClient:
             API response as dictionary.
 
         Raises:
-            requests.RequestException: If all retries fail.
+            requests.RequestException: If all endpoints and retries fail.
         """
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-        }
+        all_errors = []
 
-        last_exception = None
+        for endpoint in self.endpoints:
+            endpoint_name = endpoint["name"]
+            endpoint_url = endpoint["url"]
+            endpoint_model = endpoint["model"]
 
-        for attempt in range(self.max_retries):
-            try:
-                response = requests.post(
-                    self.BASE_URL,
-                    headers=self.headers,
-                    json=payload,
-                    timeout=120,
-                )
-                response.raise_for_status()
-                return response.json()
+            payload = {
+                "model": endpoint_model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
 
-            except requests.RequestException as e:
-                last_exception = e
-                delay = self.base_delay * (2**attempt)
-                logger.warning(
-                    f"OpenRouter request failed (attempt {attempt + 1}/{self.max_retries}): {e}. "
-                    f"Retrying in {delay}s..."
-                )
-                time.sleep(delay)
+            headers = self._get_headers(endpoint)
+            last_exception = None
 
-        logger.error(f"OpenRouter request failed after {self.max_retries} attempts")
-        raise last_exception
+            for attempt in range(self.max_retries):
+                try:
+                    logger.debug(f"Trying {endpoint_name} endpoint: {endpoint_url}")
+                    response = requests.post(
+                        endpoint_url,
+                        headers=headers,
+                        json=payload,
+                        timeout=120,
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    logger.info(f"LLM request succeeded via {endpoint_name} endpoint")
+                    return result
+
+                except requests.RequestException as e:
+                    last_exception = e
+                    delay = self.base_delay * (2**attempt)
+                    logger.warning(
+                        f"{endpoint_name} endpoint failed (attempt {attempt + 1}/{self.max_retries}): {e}. "
+                        f"Retrying in {delay}s..."
+                    )
+                    time.sleep(delay)
+
+            # All retries failed for this endpoint
+            error_msg = f"{endpoint_name}: {last_exception}"
+            all_errors.append(error_msg)
+            logger.warning(f"{endpoint_name} endpoint exhausted, trying next...")
+
+        # All endpoints failed
+        logger.error(f"All LLM endpoints failed: {all_errors}")
+        raise requests.RequestException(f"All LLM endpoints failed: {all_errors}")
 
     def chat(
         self,
@@ -137,7 +268,8 @@ class OpenRouterClient:
 
         response = self._make_request(messages, max_tokens, temperature)
 
-        return response["choices"][0]["message"]["content"]
+        # Handle different response formats from various models
+        return self._extract_content(response)
 
     def check_job_relevance(
         self,
