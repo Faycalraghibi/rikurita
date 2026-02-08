@@ -25,7 +25,7 @@ def _load_existing_job_urls() -> set[str]:
     Returns:
         Set of job post links that have already been processed.
     """
-    existing_urls = set()
+    existing_urls: set[str] = set()
 
     if not TRACKING_FILE.exists():
         logger.info("No existing applications.csv - all jobs are new")

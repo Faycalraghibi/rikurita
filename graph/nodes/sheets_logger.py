@@ -156,7 +156,7 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
         Updated state with logged status.
     """
     current_job = state.get("current_job")
-    relevance_result = state.get("relevance_result", {})
+    relevance_result = state.get("relevance_result") or {}
     resume_pdf_path = state.get("resume_pdf_path", "")
     dry_run = state.get("dry_run", False)
 

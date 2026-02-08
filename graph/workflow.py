@@ -185,8 +185,8 @@ def create_workflow() -> StateGraph:
 
 
 def run_workflow(
-    config: dict = None,
-    resume_data: dict = None,
+    config: dict | None = None,
+    resume_data: dict | None = None,
     dry_run: bool = False,
 ) -> dict:
     """
@@ -220,4 +220,4 @@ def run_workflow(
 
     final_state = workflow.invoke(initial_state)
 
-    return final_state
+    return dict(final_state)
