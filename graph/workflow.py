@@ -108,7 +108,6 @@ def print_summary_node(state: WorkflowState) -> dict:
         if len(errors) > 5:
             logger.warning(f"  ... and {len(errors) - 5} more errors")
 
-    # List generated resumes
     processed_jobs = state.get("processed_jobs", [])
     applied_jobs = [j for j in processed_jobs if j.get("status") == "Applied"]
     if applied_jobs:
@@ -130,10 +129,8 @@ def create_workflow() -> StateGraph:
     Returns:
         Compiled StateGraph workflow.
     """
-    # Create the workflow graph
     workflow = StateGraph(WorkflowState)
 
-    # Add nodes
     workflow.add_node("scheduler", scheduler_node)
     workflow.add_node("fetch_jobs", fetch_jobs_node)
     workflow.add_node("get_next_job", get_next_job_node)
@@ -144,17 +141,13 @@ def create_workflow() -> StateGraph:
     workflow.add_node("log_skipped", log_skipped_job_node)
     workflow.add_node("print_summary", print_summary_node)
 
-    # Set entry point
     workflow.set_entry_point("scheduler")
 
-    # Add edges
     workflow.add_edge("scheduler", "fetch_jobs")
     workflow.add_edge("fetch_jobs", "get_next_job")
 
-    # After getting next job, check relevance
     workflow.add_edge("get_next_job", "check_relevance")
 
-    # After relevance check, route based on result
     workflow.add_conditional_edges(
         "check_relevance",
         route_after_relevance,
@@ -164,13 +157,10 @@ def create_workflow() -> StateGraph:
         },
     )
 
-    # After resume generation, compile LaTeX
     workflow.add_edge("generate_resume", "compile_latex")
 
-    # After compilation, log to sheets
     workflow.add_edge("compile_latex", "log_to_sheets")
 
-    # After logging (both relevant and skipped), check if should continue
     workflow.add_conditional_edges(
         "log_to_sheets",
         should_continue_processing,
@@ -189,7 +179,6 @@ def create_workflow() -> StateGraph:
         },
     )
 
-    # Print summary leads to end
     workflow.add_edge("print_summary", END)
 
     return workflow.compile()
@@ -214,20 +203,17 @@ def run_workflow(
     from graph.nodes.scheduler import load_config
     from graph.nodes.scheduler import load_resume_data as load_resume
 
-    # Load config and resume data if not provided
     if config is None:
         config = load_config()
     if resume_data is None:
         resume_data = load_resume()
 
-    # Create initial state
     initial_state = create_initial_state(
         config=config,
         resume_data=resume_data,
         dry_run=dry_run,
     )
 
-    # Create and run workflow
     workflow = create_workflow()
 
     logger.info("Starting workflow execution...")

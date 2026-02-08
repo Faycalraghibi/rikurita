@@ -12,7 +12,6 @@ from pathlib import Path
 import click
 from dotenv import load_dotenv
 
-# Add project root to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
@@ -20,34 +19,28 @@ from graph.nodes.scheduler import load_config, load_resume_data  # noqa: E402
 from graph.workflow import create_workflow, run_workflow  # noqa: E402
 from utils.apify_client import ApifyJobScraper  # noqa: E402
 
-# Load environment variables
 load_dotenv()
 
 
-# Configure logging
 def setup_logging(verbose: bool = False) -> None:
     """Configure logging for the application."""
     level = logging.DEBUG if verbose else logging.INFO
 
-    # Create formatter
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
 
-    # File handler
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
     file_handler = logging.FileHandler(log_dir / "rikurita.log", encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
 
-    # Root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
     root_logger.addHandler(console_handler)
@@ -105,7 +98,6 @@ def run(ctx: click.Context, dry_run: bool, config: str, resume_data: str) -> Non
             dry_run=dry_run,
         )
 
-        # Exit with appropriate code
         if final_state.get("errors"):
             sys.exit(1)
         sys.exit(0)
@@ -151,7 +143,6 @@ def schedule(ctx: click.Context, interval: str, time: str, dry_run: bool) -> Non
         except Exception as e:
             logger.exception(f"Scheduled job failed: {e}")
 
-    # Parse time
     hour, minute = time.split(":")
     time_str = f"{hour}:{minute}"
 
@@ -186,7 +177,6 @@ def test_job(ctx: click.Context, job_url: str, dry_run: bool) -> None:
     try:
         logger.info(f"Testing with job URL: {job_url}")
 
-        # Fetch job details
         scraper = ApifyJobScraper()
         job = scraper.get_job_details(job_url)
 
@@ -197,11 +187,9 @@ def test_job(ctx: click.Context, job_url: str, dry_run: bool) -> None:
         logger.info(f"Job: {job.title} at {job.company_name}")
         logger.info(f"Description: {job.description[:200]}...")
 
-        # Load config and resume data
         config_data = load_config()
         resume_data_dict = load_resume_data()
 
-        # Create initial state with the fetched job
         from graph.state import create_initial_state
 
         initial_state = create_initial_state(
@@ -212,7 +200,6 @@ def test_job(ctx: click.Context, job_url: str, dry_run: bool) -> None:
         initial_state["all_jobs"] = [job.to_dict()]
         initial_state["total_jobs"] = 1
 
-        # Create and run workflow
         workflow = create_workflow()
         workflow.invoke(initial_state)  # Result stored for debugging if needed
 
@@ -231,12 +218,10 @@ def check_config(ctx: click.Context) -> None:
 
     errors = []
 
-    # Check config.yaml
     try:
         config = load_config()
         logger.info("✓ config.yaml loaded successfully")
 
-        # Check required fields
         if not config.get("job_search", {}).get("keywords"):
             errors.append("Missing job_search.keywords in config.yaml")
         if not config.get("user_profile"):
@@ -249,7 +234,6 @@ def check_config(ctx: click.Context) -> None:
     except Exception as e:
         errors.append(f"config.yaml error: {e}")
 
-    # Check resume_data.yaml
     try:
         load_resume_data()  # Validates file loads correctly
         logger.info("✓ resume_data.yaml loaded successfully")
@@ -258,7 +242,6 @@ def check_config(ctx: click.Context) -> None:
     except Exception as e:
         errors.append(f"resume_data.yaml error: {e}")
 
-    # Check .env
     import os
 
     if not os.getenv("OPENROUTER_API_KEY"):
@@ -278,7 +261,6 @@ def check_config(ctx: click.Context) -> None:
     else:
         logger.info("✓ GOOGLE_SHEET_ID configured")
 
-    # Check LaTeX compiler
     import shutil
 
     if shutil.which("pdflatex"):
@@ -289,7 +271,6 @@ def check_config(ctx: click.Context) -> None:
         logger.warning("⚠ No LaTeX compiler found - resumes will be saved as .tex only")
         logger.warning("  Install MiKTeX or TeX Live to enable PDF compilation")
 
-    # Summary
     if errors:
         logger.error("\n✗ Configuration errors found:")
         for error in errors:

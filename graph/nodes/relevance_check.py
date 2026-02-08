@@ -41,7 +41,6 @@ def check_relevance_node(state: WorkflowState) -> dict[str, Any]:
     logger.info(f"Checking relevance for: {job_title} at {company_name}")
 
     if not description:
-        # Fall back to title-based keyword matching
         logger.info("No description - using title-based keyword matching")
 
         import re
@@ -65,12 +64,10 @@ def check_relevance_node(state: WorkflowState) -> dict[str, Any]:
             (r"\bresearch\b", True),  # research as standalone word
         ]
 
-        # Get target roles from user profile for additional scoring
         user_profile = config.get("user_profile", {})
         target_criteria = user_profile.get("target_criteria", {})
         desired_roles = [r.lower() for r in target_criteria.get("desired_roles", [])]
 
-        # Check if job title matches core technical keywords
         title_lower = job_title.lower()
         matching_core = []
 
@@ -145,7 +142,6 @@ def check_relevance_node(state: WorkflowState) -> dict[str, Any]:
             }
 
     try:
-        # Get user background and criteria from config
         user_profile = config.get("user_profile", {})
         background = user_profile.get("background", {})
         target_criteria = user_profile.get("target_criteria", {})
@@ -154,10 +150,8 @@ def check_relevance_node(state: WorkflowState) -> dict[str, Any]:
         llm_settings = config.get("llm_settings", {})
         _model = llm_settings.get("model", "anthropic/claude-3.5-sonnet")  # noqa: F841
 
-        # Create OpenRouter client
         client = OpenRouterClient()
 
-        # Check relevance
         relevance_result = client.check_job_relevance(
             job_description=description,
             user_background=background,

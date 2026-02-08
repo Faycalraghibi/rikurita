@@ -57,10 +57,8 @@ def generate_resume_node(state: WorkflowState) -> dict[str, Any]:
         }
 
     try:
-        # Get matching points from relevance check
         matching_points = relevance_result.get("matching_points", [])
 
-        # Get LLM-based customizations for this specific job
         customizations = None
         try:
             client = OpenRouterClient()
@@ -97,7 +95,6 @@ def generate_resume_node(state: WorkflowState) -> dict[str, Any]:
                 "errors": [error_msg],
             }
 
-        # Basic validation
         if "\\documentclass" not in latex_code or "\\end{document}" not in latex_code:
             logger.warning("Generated LaTeX may be incomplete")
 
@@ -139,7 +136,6 @@ def _get_full_tailoring(
         - top_skills: list of skills to highlight first
         - top_projects: list of project names in priority order
     """
-    # Build resume context
     projects = resume_data.get("projects", [])
     experience = resume_data.get("experience", [])
     skills = resume_data.get("skills", {})
@@ -150,7 +146,6 @@ def _get_full_tailoring(
         + skills.get("other_skills", skills.get("domains", []))
     )
 
-    # Build detailed prompt
     system_prompt = """You are an expert resume tailoring assistant.
 Your job is to REWRITE resume bullet points to emphasize skills and achievements
 that are most relevant to the specific job the candidate is applying for.
@@ -182,7 +177,6 @@ Return ONLY valid JSON with this structure:
 
 Return ONLY JSON, no other text."""
 
-    # Build job context
     job_context = f"TARGET JOB: {job_title} at {company_name}"
     if description:
         job_context += f"\n\nJob Description:\n{description[:1000]}"
@@ -191,7 +185,6 @@ Return ONLY JSON, no other text."""
     if matching_points:
         job_context += f"\n\nMatching keywords: {', '.join(matching_points[:5])}"
 
-    # Build resume context
     exp_text = ""
     for exp in experience:
         company = exp.get("company", "")
@@ -235,7 +228,6 @@ Keep the core facts accurate but adjust the language and emphasis."""
         # Add delay after LLM call to avoid rate limiting
         time.sleep(LLM_CALL_DELAY)
 
-        # Clean up response
         response = response.strip()
         if response.startswith("```"):
             parts = response.split("```")

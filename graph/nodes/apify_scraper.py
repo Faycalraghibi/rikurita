@@ -77,10 +77,8 @@ def fetch_jobs_node(state: WorkflowState) -> dict[str, Any]:
             "workflow_complete": True,
         }
 
-    # Load existing job URLs for deduplication
     existing_urls = _load_existing_job_urls()
 
-    # Check if using cached dataset or running fresh search
     use_cached_dataset = job_search.get("use_cached_dataset", False)
     if use_cached_dataset:
         logger.info(
@@ -102,10 +100,8 @@ def fetch_jobs_node(state: WorkflowState) -> dict[str, Any]:
             use_cached_dataset=use_cached_dataset,
         )
 
-        # Convert JobListing objects to dicts
         job_dicts = [job.to_dict() for job in jobs]
 
-        # Filter out already-processed jobs
         original_count = len(job_dicts)
         job_dicts = [
             job
@@ -128,7 +124,6 @@ def fetch_jobs_node(state: WorkflowState) -> dict[str, Any]:
                 "workflow_complete": True,
             }
 
-        # Log sample job titles
         logger.info("Sample job titles:")
         for job in job_dicts[:5]:
             logger.info(

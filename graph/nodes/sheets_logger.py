@@ -167,7 +167,6 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
     company_name = current_job.get("company_name", "Unknown")
     job_title = current_job.get("title", "Unknown")
 
-    # Determine application status
     is_relevant = state.get("is_relevant", False)
     if not is_relevant:
         status = ApplicationStatus.SKIPPED.value
@@ -186,7 +185,6 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
 
     job_link = current_job.get("job_post_link", "")
 
-    # Check if already logged locally
     if job_link and _check_if_logged_locally(job_link):
         logger.info(f"Job already logged, skipping: {job_link}")
         return {
@@ -195,7 +193,6 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
 
     logger.info(f"Logging application: {company_name} - {job_title} ({status})")
 
-    # Prepare row data
     timestamp = datetime.now().isoformat()
     description = current_job.get("description", "")
     if len(description) > 500:
@@ -219,7 +216,6 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
         notes[:200],
     ]
 
-    # Log to local CSV
     csv_success = _log_to_csv(row_data)
 
     if csv_success:
@@ -227,10 +223,8 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
     else:
         logger.warning("Failed to log to local CSV")
 
-    # Try Google Sheets if configured
     _try_log_to_sheets(current_job, relevance_result, resume_pdf_path, status, notes)
 
-    # Create processed job record
     processed_job = {
         **current_job,
         "relevance_score": relevance_result.get(

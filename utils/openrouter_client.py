@@ -46,10 +46,8 @@ class OpenRouterClient:
         self.base_delay = base_delay
         self.api_key = os.getenv("OPENROUTER_API_KEY", "")
 
-        # Build list of endpoints to try
         self.endpoints = []
 
-        # Primary endpoint
         primary_url = os.getenv("LLM_BASE_URL")
         if primary_url:
             self.endpoints.append(
@@ -60,7 +58,6 @@ class OpenRouterClient:
                 }
             )
 
-        # Fallback endpoint
         fallback_url = os.getenv("LLM_BASE_URL_FALLBACK")
         if fallback_url:
             self.endpoints.append(
@@ -322,7 +319,6 @@ Provide your analysis in JSON format."""
 
         response = self.chat(prompt, system_prompt, temperature=0.2)
 
-        # Parse JSON response
         import json
 
         try:
@@ -430,7 +426,6 @@ Return only the LaTeX code starting with \\documentclass and ending with \\end{{
 
         response = self.chat(prompt, system_prompt, max_tokens=6000, temperature=0.4)
 
-        # Extract LaTeX code if wrapped in markdown
         latex_code = response.strip()
         if latex_code.startswith("```"):
             parts = latex_code.split("```")

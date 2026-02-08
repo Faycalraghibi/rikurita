@@ -111,7 +111,6 @@ def compile_latex(
     tex_path = output_dir / f"{filename}.tex"
     pdf_path = output_dir / f"{filename}.pdf"
 
-    # Write LaTeX source file
     try:
         with open(tex_path, "w", encoding="utf-8") as f:
             f.write(latex_code)
@@ -119,7 +118,6 @@ def compile_latex(
     except Exception as e:
         return False, None, None, f"Failed to write .tex file: {e}"
 
-    # Try local compilation first
     local_success, local_error = _try_local_compilation(
         latex_code, tex_path, pdf_path, filename
     )
@@ -150,10 +148,8 @@ def _try_local_compilation(
         temp_tex = Path(temp_dir) / f"{filename}.tex"
         temp_pdf = Path(temp_dir) / f"{filename}.pdf"
 
-        # Copy tex file to temp directory
         shutil.copy(tex_path, temp_tex)
 
-        # Try latexmk first, then pdflatex
         compilers = [
             [
                 "latexmk",
@@ -307,13 +303,10 @@ def compile_latex_node(state: WorkflowState) -> dict[str, Any]:
     logger.info(f"Compiling resume for: {company_name} - {job_title}")
 
     try:
-        # Create directory structure
         output_dir = create_resume_directory(company_name, job_title)
 
-        # Generate filename
         filename = generate_resume_filename(company_name, job_title)
 
-        # Check for existing files and add version if needed
         base_pdf = output_dir / f"{filename}.pdf"
         version = 1
         while base_pdf.exists():
@@ -325,7 +318,6 @@ def compile_latex_node(state: WorkflowState) -> dict[str, Any]:
             filename = f"{filename}_v{version}"
             logger.info(f"File exists, using version {version}")
 
-        # Compile LaTeX
         success, pdf_path, tex_path, error = compile_latex(
             latex_code=latex_code,
             output_dir=output_dir,

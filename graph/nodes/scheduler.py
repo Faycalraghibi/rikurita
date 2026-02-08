@@ -73,7 +73,6 @@ def scheduler_node(state: WorkflowState) -> dict[str, Any]:
     logger.info("RIKURITA JOB APPLICATION WORKFLOW")
     logger.info("=" * 60)
 
-    # Check if config is already loaded
     config = state.get("config", {})
     resume_data = state.get("resume_data", {})
 
@@ -83,7 +82,6 @@ def scheduler_node(state: WorkflowState) -> dict[str, Any]:
     if not resume_data:
         resume_data = load_resume_data()
 
-    # Extract job search settings
     job_search = config.get("job_search", {})
     keywords = job_search.get("keywords", "")
     location = job_search.get("location", "")
@@ -97,7 +95,6 @@ def scheduler_node(state: WorkflowState) -> dict[str, Any]:
     logger.info(f"  Relevance Threshold: {relevance_threshold}")
     logger.info(f"  Dry Run: {state.get('dry_run', False)}")
 
-    # Validate required settings
     if not keywords:
         error_msg = "No job search keywords configured in config.yaml"
         logger.error(error_msg)
