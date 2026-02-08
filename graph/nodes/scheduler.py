@@ -36,7 +36,7 @@ def load_config(config_path: str = "config.yaml") -> dict:
     return config
 
 
-def load_resume_data(resume_data_path: str = "resume_data.yaml") -> dict:
+def load_resume_data(resume_data_path: str = "templates/resume_data.yaml") -> dict:
     """
     Load resume data from YAML file.
 

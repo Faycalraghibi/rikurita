@@ -82,7 +82,7 @@ def cli(ctx: click.Context, verbose: bool) -> None:
     "--resume-data",
     "-r",
     type=click.Path(exists=True),
-    default="resume_data.yaml",
+    default="templates/resume_data.yaml",
     help="Path to resume data file",
 )
 @click.pass_context
