@@ -1,257 +1,79 @@
-# Rikurita 🚀
+# Rikurita
 
-**Automated Job Application System** - A LangGraph-powered workflow that scrapes LinkedIn jobs via Apify, evaluates job relevance using AI, generates customized LaTeX resumes, and tracks applications in Google Sheets.
+Automated job application system. Scrapes LinkedIn jobs via Apify, filters by relevance, generates tailored LaTeX resumes, and logs to CSV/Google Sheets.
 
-## Features
-
-- 🔍 **Automated Job Scraping** - Fetches jobs from LinkedIn via Apify API
-- 🤖 **AI-Powered Relevance Filtering** - Uses LLMs to score job fit (0-10)
-- 📄 **Customized Resume Generation** - Creates tailored LaTeX resumes for each position
-- 📊 **Google Sheets Tracking** - Logs all applications with full metadata
-- 🗂️ **Organized File Structure** - Saves resumes in `resumes/{company}/{role}/` format
-- ⏰ **Scheduling Support** - Run once, on schedule, or test with specific jobs
-- 🔄 **Retry Logic** - Exponential backoff for API calls
-
-## Quick Start
-
-### 1. Create Virtual Environment
+## Setup
 
 ```bash
-# Create venv
 python -m venv venv
-
-# Activate (Windows)
-.\venv\Scripts\activate
-
-# Activate (Linux/Mac)
-source venv/bin/activate
-```
-
-### 2. Install Dependencies
-
-```bash
+.\venv\Scripts\activate  # Windows
 pip install -r requirements.txt
-```
-
-### 3. Configure Environment
-
-```bash
-# Copy example env file
 copy .env.example .env
-
-# Edit .env with your API keys
 ```
 
-Required API keys:
-- `OPENROUTER_API_KEY` - Get from [OpenRouter](https://openrouter.ai/)
-- `APIFY_API_TOKEN` - Get from [Apify](https://apify.com/)
-- `GOOGLE_SHEET_ID` - Your Google Sheet ID for tracking
+Edit `.env`:
+```
+APIFY_API_TOKEN=your-token
+LLM_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+LLM_MODEL=anthropic/claude-3-haiku
+OPENROUTER_API_KEY=your-key
+```
 
-### 4. Initialize Project
+Optional LLM fallback (tries primary first, then fallback):
+```
+LLM_BASE_URL=http://localhost:1234/v1/chat/completions
+LLM_MODEL=local-model
+LLM_BASE_URL_FALLBACK=https://openrouter.ai/api/v1/chat/completions
+LLM_MODEL_FALLBACK=anthropic/claude-3-haiku
+```
+
+Edit `config.yaml` with your job search settings.
+Edit `templates/resume_data.yaml` with your resume content.
+
+## Usage
 
 ```bash
-python main.py init
+python main.py init           # Create directories
+python main.py check-config   # Validate setup
+python main.py run            # Run workflow
+python main.py run --dry-run  # Test without generating resumes
+python main.py test-job <url> # Test single job URL
 ```
-
-This creates required directories and copies templates.
-
-### 5. Validate Configuration
-
-```bash
-python main.py check-config
-```
-
-### 6. Run Workflow
-
-```bash
-# Dry run (no resumes generated)
-python main.py run --dry-run
-
-# Full run
-python main.py run
-
-# Test with specific job
-python main.py test-job <linkedin-job-url>
-
-# Run on schedule
-python main.py schedule --interval daily --time 09:00
-```
-
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `python main.py run` | Run workflow once |
-| `python main.py run --dry-run` | Dry run without generating resumes |
-| `python main.py schedule --interval daily` | Run on schedule (hourly/daily/weekly) |
-| `python main.py test-job <url>` | Test with a specific LinkedIn job URL |
-| `python main.py check-config` | Validate all configuration files |
-| `python main.py init` | Initialize project structure |
 
 ## Project Structure
 
 ```
-rikurita/
-├── main.py                 # CLI entry point
-├── config.yaml             # User configuration
-├── resume_data.yaml        # Your resume data
-├── .env                    # API keys (create from .env.example)
-├── graph/
-│   ├── workflow.py         # LangGraph workflow definition
-│   ├── state.py            # State schema
-│   └── nodes/              # Workflow nodes
-│       ├── scheduler.py
-│       ├── apify_scraper.py
-│       ├── relevance_check.py
-│       ├── resume_generator.py
-│       ├── latex_compiler.py
-│       └── sheets_logger.py
-├── utils/
-│   ├── openrouter_client.py
-│   ├── apify_client.py
-│   └── sheets_client.py
-├── templates/
-│   └── base_resume.tex
-├── resumes/                # Generated resumes
-│   └── {Company}/
-│       └── {Role}/
-│           ├── resume_{company}_{role}_{date}.pdf
-│           └── resume_{company}_{role}_{date}.tex
-└── logs/                   # Application logs
+config.yaml                    # Job search settings
+templates/resume_data.yaml     # Your resume data
+.env                           # API keys
+graph/nodes/                   # Workflow nodes
+utils/                         # API clients
+track/
+  applications.csv             # Application log
+  resumes/{Company}/{Role}/    # Generated PDFs
 ```
 
 ## Configuration
 
-### config.yaml
+`config.yaml`:
+- `job_search.keywords` - LinkedIn search query
+- `job_search.location` - Location filter
+- `job_search.max_jobs_per_run` - Limit per run
+- `job_search.relevance_threshold` - Min score (0-10) to generate resume
 
-```yaml
-user_profile:
-  name: "Your Name"
-  background:
-    summary: "Your professional summary"
-    skills: ["Python", "ML", "Data Science"]
-  target_criteria:
-    desired_roles: ["Data Scientist", "ML Engineer"]
-    preferred_locations: ["Remote", "Paris"]
-
-job_search:
-  keywords: "machine learning engineer intern"
-  location: "france"
-  max_jobs_per_run: 50
-  relevance_threshold: 7  # Minimum score to generate resume
-
-llm_settings:
-  model: "anthropic/claude-3.5-sonnet"
-```
-
-### resume_data.yaml
-
-Contains your structured resume data (experience, education, skills, projects) that the LLM uses to generate customized resumes.
-
-## Google Sheets Tracking
-
-The workflow logs applications with these columns:
-
-| Column | Description |
-|--------|-------------|
-| Timestamp | When logged |
-| Job Post Link | LinkedIn URL |
-| Job Title | Position title |
-| Job Type | Full-time, Part-time, etc. |
-| Seniority Level | Entry, Mid-Senior, etc. |
-| Posted At | When job was posted |
-| Company Name | Company |
-| Company Website | Company URL |
-| Salary | Compensation info |
-| Description | Job description |
-| Resume Path | Local path to PDF |
-| Application URL | Apply link |
-| Relevance Score | 0-10 LLM score |
-| Application Status | Applied/Pending/Skipped |
-| Notes | Match reasoning |
-
-## Google Sheets Setup
-
-1. Create a new Google Sheet
-2. Enable Google Sheets API in [Google Cloud Console](https://console.cloud.google.com/)
-3. Create a service account and download credentials JSON
-4. Share the sheet with the service account email
-5. Set `GOOGLE_SHEETS_CREDENTIALS_PATH` and `GOOGLE_SHEET_ID` in `.env`
+`templates/resume_data.yaml`:
+- Personal info, education, experience, projects, skills
+- Used by LLM to tailor resumes for each job
 
 ## Requirements
 
 - Python 3.10+
-- pdflatex or latexmk (for resume compilation)
-- Internet connection for API calls
-
-## Workflow Diagram
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Scheduler  │────▶│ Fetch Jobs  │────▶│  Get Next   │
-│   (Start)   │     │   (Apify)   │     │    Job      │
-└─────────────┘     └─────────────┘     └──────┬──────┘
-                                               │
-                    ┌──────────────────────────┘
-                    ▼
-              ┌─────────────┐
-              │   Check     │
-              │ Relevance   │
-              │  (LLM)      │
-              └──────┬──────┘
-                     │
-         ┌───────────┴───────────┐
-         ▼                       ▼
-   [Score ≥ 7]              [Score < 7]
-         │                       │
-         ▼                       ▼
-  ┌─────────────┐         ┌─────────────┐
-  │  Generate   │         │    Log      │
-  │   Resume    │         │  Skipped    │
-  │   (LLM)     │         └──────┬──────┘
-  └──────┬──────┘                │
-         │                       │
-         ▼                       │
-  ┌─────────────┐                │
-  │  Compile    │                │
-  │   LaTeX     │                │
-  └──────┬──────┘                │
-         │                       │
-         ▼                       │
-  ┌─────────────┐                │
-  │   Log to    │◀───────────────┘
-  │   Sheets    │
-  └──────┬──────┘
-         │
-         ▼
-   [More jobs?]────Yes────▶ Get Next Job
-         │
-         No
-         │
-         ▼
-  ┌─────────────┐
-  │   Print     │
-  │  Summary    │
-  └─────────────┘
-```
+- pdflatex or latexmk
+- Apify account (LinkedIn scraping)
+- OpenRouter API key or local LLM
 
 ## Troubleshooting
 
-### LaTeX compilation fails
-- Ensure pdflatex or latexmk is installed
-- Check the saved .tex file for syntax errors
-- Run `python main.py check-config` to verify setup
-
-### Apify returns no jobs
-- Check your APIFY_API_TOKEN
-- Verify the LinkedIn Jobs Scraper actor is available
-- Try adjusting search keywords or location
-
-### Google Sheets not logging
-- Verify service account has access to the sheet
-- Check credentials path in .env
-- Ensure Google Sheets API is enabled
-
-## License
-
-MIT
+LaTeX fails: Check `track/resumes/**/*.tex` for syntax errors.
+No jobs: Verify `APIFY_API_TOKEN` and search keywords.
+LLM fails: Check `LLM_BASE_URL` and API key in `.env`.

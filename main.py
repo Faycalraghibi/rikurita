@@ -302,41 +302,33 @@ def check_config(ctx: click.Context) -> None:
 @cli.command()
 @click.pass_context
 def init(ctx: click.Context) -> None:
-    """Initialize project with example configuration files."""
+    """Initialize project with required files."""
     logger = logging.getLogger(__name__)
 
-    # Create directories
-    dirs = ["resumes", "logs", "templates", "credentials"]
-    for dir_name in dirs:
-        Path(dir_name).mkdir(exist_ok=True)
-        logger.info(f"Created directory: {dir_name}/")
-
-    # Create .env from .env.example if it doesn't exist
     env_file = Path(".env")
-    env_example = Path(".env.example")
 
-    if not env_file.exists() and env_example.exists():
-        import shutil
+    if not env_file.exists():
+        env_content = """# Apify (LinkedIn scraping)
+APIFY_API_TOKEN=your-apify-token
 
-        shutil.copy(env_example, env_file)
-        logger.info("Created .env from .env.example")
-        logger.warning("⚠ Remember to add your API keys to .env!")
+# LLM Configuration (primary endpoint)
+LLM_BASE_URL=https://openrouter.ai/api/v1/chat/completions
+LLM_MODEL=anthropic/claude-3-haiku
+OPENROUTER_API_KEY=your-openrouter-key
 
-    # Copy base resume template if it doesn't exist
-    template_src = Path("main.tex")
-    template_dst = Path("templates/base_resume.tex")
+# Optional: Fallback LLM endpoint (tried if primary fails)
+# LLM_BASE_URL_FALLBACK=http://localhost:1234/v1/chat/completions
+# LLM_MODEL_FALLBACK=local-model
+"""
+        env_file.write_text(env_content)
+        logger.info("Created .env file")
+        logger.warning("Fill in your API keys in .env!")
 
-    if template_src.exists() and not template_dst.exists():
-        import shutil
-
-        shutil.copy(template_src, template_dst)
-        logger.info(f"Copied {template_src} to {template_dst}")
-
-    logger.info("\n✓ Project initialized!")
+    logger.info("\nProject initialized!")
     logger.info("\nNext steps:")
     logger.info("1. Add your API keys to .env")
     logger.info("2. Review and customize config.yaml")
-    logger.info("3. Update resume_data.yaml with your information")
+    logger.info("3. Update templates/resume_data.yaml with your information")
     logger.info("4. Run: python main.py check-config")
     logger.info("5. Run: python main.py run --dry-run")
 
