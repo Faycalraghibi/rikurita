@@ -18,7 +18,7 @@ from graph.state import WorkflowState
 logger = logging.getLogger(__name__)
 
 # Base directory for resume storage
-RESUMES_DIR = Path("resumes")
+RESUMES_DIR = Path("track/resumes")
 
 
 def sanitize_filename(name: str) -> str:

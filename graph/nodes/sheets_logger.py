@@ -17,7 +17,7 @@ from graph.state import ApplicationStatus, WorkflowState
 logger = logging.getLogger(__name__)
 
 # Local tracking file
-TRACKING_FILE = Path("applications.csv")
+TRACKING_FILE = Path("track/applications.csv")
 
 # CSV column headers (same as Google Sheets)
 CSV_HEADERS = [
