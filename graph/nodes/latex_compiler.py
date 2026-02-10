@@ -32,7 +32,7 @@ def sanitize_filename(name: str) -> str:
         Sanitized string safe for filesystem.
     """
     # Remove or replace invalid characters
-    sanitized = re.sub(r'[<>:"/\\|?*]', "", name)
+    sanitized = re.sub(r"[<>:\"/\\|?*&']", "", name)
     # Replace spaces and dashes with underscores
     sanitized = re.sub(r"[\s\-]+", "_", sanitized)
     # Remove consecutive underscores
@@ -168,35 +168,48 @@ def _try_local_compilation(
 ) -> tuple[bool, str]:
     """Try compiling with local LaTeX compilers."""
 
+    # Per-process timeout in seconds
+    COMPILE_TIMEOUT = 30
+
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_tex = Path(temp_dir) / f"{filename}.tex"
         temp_pdf = Path(temp_dir) / f"{filename}.pdf"
 
         shutil.copy(tex_path, temp_tex)
 
-        compilers = [
-            [
-                "latexmk",
-                "-pdf",
-                "-interaction=nonstopmode",
-                "-output-directory=" + temp_dir,
-                str(temp_tex),
-            ],
-            [
-                "pdflatex",
-                "-interaction=nonstopmode",
-                "-output-directory=" + temp_dir,
-                str(temp_tex),
-            ],
-            [
-                "xelatex",
-                "-interaction=nonstopmode",
-                "-output-directory=" + temp_dir,
-                str(temp_tex),
-            ],
+        # (command, num_passes) — latexmk manages passes internally
+        compilers: list[tuple[list[str], int]] = [
+            (
+                [
+                    "latexmk",
+                    "-pdf",
+                    "-interaction=nonstopmode",
+                    "-output-directory=" + temp_dir,
+                    str(temp_tex),
+                ],
+                1,  # latexmk handles multi-pass internally
+            ),
+            (
+                [
+                    "pdflatex",
+                    "-interaction=nonstopmode",
+                    "-output-directory=" + temp_dir,
+                    str(temp_tex),
+                ],
+                2,  # two passes for references
+            ),
+            (
+                [
+                    "xelatex",
+                    "-interaction=nonstopmode",
+                    "-output-directory=" + temp_dir,
+                    str(temp_tex),
+                ],
+                2,
+            ),
         ]
 
-        for compiler_cmd in compilers:
+        for compiler_cmd, num_passes in compilers:
             compiler_name = compiler_cmd[0]
 
             if shutil.which(compiler_name) is None:
@@ -205,12 +218,12 @@ def _try_local_compilation(
             logger.info(f"Compiling with {compiler_name}...")
 
             try:
-                for _ in range(2):  # Two passes for references
+                for _ in range(num_passes):
                     subprocess.run(
                         compiler_cmd,
                         capture_output=True,
                         text=True,
-                        timeout=60,
+                        timeout=COMPILE_TIMEOUT,
                         cwd=temp_dir,
                     )
 
@@ -221,11 +234,13 @@ def _try_local_compilation(
                     shutil.copy(temp_pdf, pdf_path)
                     logger.info(f"Compiled PDF: {pdf_path}")
                     return True, ""
+                else:
+                    logger.warning(f"{compiler_name} finished but no PDF produced")
 
             except subprocess.TimeoutExpired:
-                pass
-            except Exception:
-                pass
+                logger.warning(f"{compiler_name} timed out after {COMPILE_TIMEOUT}s")
+            except Exception as e:
+                logger.warning(f"{compiler_name} failed: {e}")
 
         return False, "No local LaTeX compiler found (pdflatex, xelatex, latexmk)"
 

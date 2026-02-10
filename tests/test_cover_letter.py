@@ -1,7 +1,7 @@
 """
 Unit Tests for Cover Letter Generator
 
-Tests for the cover letter generation node, filename generation,
+Tests for the cover letter generation node (code-based template), filename generation,
 compilation integration, and workflow wiring.
 """
 
@@ -10,27 +10,12 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 class TestCoverLetterGeneratorNode:
-    """Tests for generate_cover_letter_node."""
-
-    @pytest.fixture
-    def boilerplate_file(self, tmp_path):
-        """Create a temporary boilerplate file."""
-        content = r"""\documentclass{article}
-\begin{document}
-Dear <<RECRUITMENT_TEAM>>,
-I am <<FIRST_NAME>> <<LAST_NAME>> applying for <<POSITION_TITLE>> at <<COMPANY_NAME>>.
-\end{document}
-"""
-        boilerplate = tmp_path / "cover_letter_boilerplate.tex"
-        boilerplate.write_text(content)
-        return str(boilerplate)
+    """Tests for generate_cover_letter_node using Python template."""
 
     def test_node_disabled_returns_empty(self):
         """Node returns empty LaTeX when cover_letter.enabled is false."""
@@ -74,73 +59,67 @@ I am <<FIRST_NAME>> <<LAST_NAME>> applying for <<POSITION_TITLE>> at <<COMPANY_N
 
         assert result["generated_cover_letter_latex"] == ""
 
-    def test_node_missing_boilerplate_returns_error(self):
-        """Node returns error when boilerplate file is not found."""
-        from graph.nodes.cover_letter_generator import generate_cover_letter_node
-
-        state = {
-            "config": {
-                "cover_letter": {
-                    "enabled": True,
-                    "base_latex_file": "nonexistent.tex",
-                }
-            },
-            "current_job": {"title": "Test", "company_name": "TestCo"},
-            "resume_data": {},
-        }
-
-        result = generate_cover_letter_node(state)
-
-        assert result["generated_cover_letter_latex"] == ""
-        assert len(result["errors"]) > 0
-
+    @patch("graph.nodes.cover_letter_generator.generate_cover_letter_from_template")
+    @patch("graph.nodes.cover_letter_generator._load_cover_letter_data")
     @patch("graph.nodes.cover_letter_generator.OpenRouterClient")
-    def test_placeholder_substitution(self, mock_client_cls, boilerplate_file):
-        """All placeholder tokens are replaced in the boilerplate."""
+    def test_template_generation_with_llm_overrides(
+        self, mock_client_cls, mock_load_data, mock_generate_template
+    ):
+        """Node calls template function with merged data (YAML + LLM)."""
         import json
 
         from graph.nodes.cover_letter_generator import generate_cover_letter_node
 
+        # Mock YAML data
+        mock_load_data.return_value = {
+            "recruitment_team": "Default Team",
+            "company_motivation": "Default Motivation",
+        }
+
+        # Mock LLM response
         mock_client = MagicMock()
         mock_client.chat.return_value = json.dumps(
             {
-                "POSITION_TITLE": "ML Engineer",
-                "RECRUITMENT_TEAM": "HR Team",
-                "COMPANY_NAME": "TestCo",
+                "company_motivation": "LLM Motivation",
+                "role_missions": "LLM Missions",
             }
         )
         mock_client_cls.return_value = mock_client
 
+        # Mock template generation
+        mock_generate_template.return_value = r"\documentclass{moderncv}..."
+
         state = {
-            "config": {
-                "cover_letter": {
-                    "enabled": True,
-                    "base_latex_file": boilerplate_file,
-                }
-            },
+            "config": {"cover_letter": {"enabled": True}},
             "current_job": {
                 "title": "ML Engineer",
                 "company_name": "TestCo",
-                "description": "Looking for ML engineers",
+                "description": "Job Desc",
             },
             "resume_data": {
-                "personal": {
-                    "name": "John Doe",
-                    "email": "john@example.com",
-                    "phone": "+1234567890",
-                }
+                "personal": {"name": "John Doe"},
             },
             "relevance_result": {},
         }
 
         result = generate_cover_letter_node(state)
 
-        latex = result["generated_cover_letter_latex"]
-        assert "John" in latex  # FIRST_NAME substituted from static
-        assert "Doe" in latex  # LAST_NAME substituted from static
-        assert "ML Engineer" in latex  # POSITION_TITLE from LLM
-        assert "<<FIRST_NAME>>" not in latex
-        assert "<<LAST_NAME>>" not in latex
+        assert result["generated_cover_letter_latex"] == r"\documentclass{moderncv}..."
+
+        # Verify call to template function
+        mock_generate_template.assert_called_once()
+        call_kwargs = mock_generate_template.call_args[1]
+
+        # passed data should be merged
+        passed_data = call_kwargs["cover_letter_data"]
+        assert passed_data["recruitment_team"] == "Default Team"  # From YAML
+        assert (
+            passed_data["company_motivation"] == "LLM Motivation"
+        )  # Overridden by LLM
+        assert passed_data["role_missions"] == "LLM Missions"  # From LLM only
+
+        assert call_kwargs["job_title"] == "ML Engineer"
+        assert call_kwargs["company_name"] == "TestCo"
 
 
 class TestCoverLetterFilename:
@@ -166,6 +145,7 @@ class TestCoverLetterFilename:
         filename = generate_cover_letter_filename("Test Company", "Senior Lead", date)
 
         assert "/" not in filename
+        assert "&" not in filename
         assert " " not in filename
         assert filename.startswith("coverletter_")
         assert "Test_Company" in filename
@@ -305,46 +285,30 @@ class TestStateExtension:
         assert "cover_letter_path" in job_dict
 
 
-class TestFallbackValues:
-    """Tests for cover letter fallback value generation."""
+class TestCoverLetterTemplate:
+    """Tests for utils.cover_letter_template."""
 
-    def test_fallback_returns_all_tokens(self):
-        """Fallback values include all required dynamic tokens."""
-        from graph.nodes.cover_letter_generator import _get_fallback_values
+    def test_generate_from_template_structure(self):
+        """Template generates valid LaTeX loop structure."""
+        from utils.cover_letter_template import generate_cover_letter_from_template
 
-        resume_data = {
-            "personal": {"name": "Test User", "title": "Engineer"},
-            "skills": {"programming_languages": ["Python", "Java", "C++"]},
-            "education": [{"degree": "MSc Computer Science", "institution": "MIT"}],
+        cl_data = {
+            "recruitment_team": "Team A",
+            "company_motivation": "Motivation Text",
+            "role_missions": "Mission Text",
+            # other fields optional or handled gracefully
         }
+        personal = {"name": "John Doe", "email": "john@example.com"}
 
-        result = _get_fallback_values(resume_data, "ML Engineer", "Google")
+        latex = generate_cover_letter_from_template(
+            cl_data, personal, "Job Title", "Company X"
+        )
 
-        assert result["POSITION_TITLE"] == "ML Engineer"
-        assert result["COMPANY_NAME"] == "Google"
-        assert "EDUCATION_STATUS" in result
-        assert "MAIN_SKILLS" in result
-        assert "Python" in result["MAIN_SKILLS"]
-
-    def test_static_values_extraction(self):
-        """Static values are correctly extracted from personal data."""
-        from graph.nodes.cover_letter_generator import _extract_static_values
-
-        personal = {
-            "name": "Jane Smith",
-            "email": "jane@example.com",
-            "phone": "+1234567890",
-        }
-        config = {
-            "user_profile": {
-                "target_criteria": {"preferred_locations": ["Paris", "Remote"]}
-            }
-        }
-
-        result = _extract_static_values(personal, config)
-
-        assert result["FIRST_NAME"] == "Jane"
-        assert result["LAST_NAME"] == "Smith"
-        assert result["EMAIL"] == "jane@example.com"
-        assert result["PHONE"] == "+1234567890"
-        assert result["LOCATION"] == "Paris"
+        assert r"\documentclass" in latex
+        assert r"\begin{document}" in latex
+        assert r"\end{document}" in latex
+        assert "John" in latex
+        assert "Doe" in latex
+        assert "Team A" in latex
+        assert "Motivation Text" in latex
+        assert "Company X" in latex

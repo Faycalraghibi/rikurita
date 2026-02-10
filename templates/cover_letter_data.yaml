@@ -1,0 +1,36 @@
+# Cover Letter Data
+# Structured data for LLM-based cover letter customization
+# Mirrors the format of resume_data.yaml
+
+# Static personal info (pre-filled directly from resume_data)
+# These fields are auto-populated: FIRST_NAME, LAST_NAME, PHONE, EMAIL, LOCATION
+
+# Dynamic fields below are either LLM-generated per job or use these defaults as fallback
+cover_letter:
+  # Recipient
+  recruitment_team: "Recruitment Team"
+
+  # Context paragraph
+  education_status: "a final-year Master's student in Computer Science"
+  specialization: "Machine Learning and Data Science"
+  start_date: "as soon as possible"
+
+  # Company motivation paragraph
+  company_motivation: "its innovative approach to technology and its commitment to impactful solutions"
+  company_impact: "the technical challenges and innovative projects at the company"
+
+  # Technical fit paragraph
+  main_skills:
+    - "Python"
+    - "Machine Learning"
+    - "Deep Learning"
+    - "Data Analysis"
+    - "SQL"
+  relevant_projects: "end-to-end ML pipelines and data-driven applications"
+  tech_challenges: "model optimization, large-scale data processing, and production deployment"
+
+  # Role alignment paragraph
+  role_missions: "data modeling, algorithm development, and analytical problem-solving"
+
+  # Closing paragraph
+  learning_objectives: "applied machine learning and cloud-based data engineering"

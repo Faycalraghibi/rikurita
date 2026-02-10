@@ -159,10 +159,14 @@ Missing end document tag
         content = tex_path.read_text()
         assert "Hello, World!" in content
 
+    @patch("graph.nodes.latex_compiler._try_online_compilation")
     @patch("shutil.which")
-    def test_handles_missing_compiler(self, mock_which, tmp_path, valid_latex):
+    def test_handles_missing_compiler(
+        self, mock_which, mock_online, tmp_path, valid_latex
+    ):
         """Test graceful handling when no LaTeX compiler is available."""
         mock_which.return_value = None
+        mock_online.return_value = (False, "Mocked online failure")
 
         success, pdf_path, tex_path, error = compile_latex(
             valid_latex, tmp_path, "test_resume"
