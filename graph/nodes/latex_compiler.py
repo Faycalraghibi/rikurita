@@ -90,6 +90,30 @@ def generate_resume_filename(
     return f"resume_{company}_{role}_{date_str}"
 
 
+def generate_cover_letter_filename(
+    company_name: str, role_title: str, date: datetime | None = None
+) -> str:
+    """
+    Generate a filename for the cover letter.
+
+    Args:
+        company_name: Name of the company.
+        role_title: Title of the role.
+        date: Date for the filename (defaults to now).
+
+    Returns:
+        Filename (without extension) with coverletter_ prefix.
+    """
+    if date is None:
+        date = datetime.now()
+
+    company = sanitize_filename(company_name)
+    role = sanitize_filename(role_title)
+    date_str = date.strftime("%Y-%m-%d")
+
+    return f"coverletter_{company}_{role}_{date_str}"
+
+
 def compile_latex(
     latex_code: str,
     output_dir: Path,
@@ -267,91 +291,138 @@ def _try_online_compilation(latex_code: str, pdf_path: Path) -> tuple[bool, str]
         return False, f"Online compilation error: {e}"
 
 
+def _versioned_filename(output_dir: Path, filename: str) -> str:
+    """
+    Generate a versioned filename if the base already exists.
+
+    Args:
+        output_dir: Directory to check for existing files.
+        filename: Base filename (without extension).
+
+    Returns:
+        Possibly versioned filename.
+    """
+    base_pdf = output_dir / f"{filename}.pdf"
+    version = 1
+    while base_pdf.exists():
+        version += 1
+        versioned = f"{filename}_v{version}"
+        base_pdf = output_dir / f"{versioned}.pdf"
+
+    if version > 1:
+        filename = f"{filename}_v{version}"
+        logger.info(f"File exists, using version {version}")
+
+    return filename
+
+
 def compile_latex_node(state: WorkflowState) -> dict[str, Any]:
     """
     Compile generated LaTeX to PDF and organize files.
+
+    Compiles the resume, and if a cover letter was generated,
+    compiles that too using the same output directory.
 
     Args:
         state: Current workflow state.
 
     Returns:
-        Updated state with resume paths.
+        Updated state with resume and cover letter paths.
     """
     current_job = state.get("current_job")
     latex_code = state.get("generated_latex", "")
+    cover_letter_latex = state.get("generated_cover_letter_latex", "")
 
     if not current_job:
         logger.warning("No current job for LaTeX compilation")
         return {
             "resume_pdf_path": "",
             "resume_tex_path": "",
-        }
-
-    if not latex_code:
-        error_msg = "No LaTeX code to compile"
-        logger.warning(error_msg)
-        return {
-            "resume_pdf_path": "",
-            "resume_tex_path": "",
-            "errors": [error_msg],
-            "jobs_failed": state.get("jobs_failed", 0) + 1,
+            "cover_letter_pdf_path": "",
+            "cover_letter_tex_path": "",
         }
 
     company_name = current_job.get("company_name", "Unknown")
     job_title = current_job.get("title", "Unknown")
+
+    result: dict[str, Any] = {
+        "resume_pdf_path": "",
+        "resume_tex_path": "",
+        "cover_letter_pdf_path": "",
+        "cover_letter_tex_path": "",
+    }
+
+    if not latex_code:
+        error_msg = "No LaTeX code to compile"
+        logger.warning(error_msg)
+        result["errors"] = [error_msg]
+        result["jobs_failed"] = state.get("jobs_failed", 0) + 1
+        return result
 
     logger.info(f"Compiling resume for: {company_name} - {job_title}")
 
     try:
         output_dir = create_resume_directory(company_name, job_title)
 
-        filename = generate_resume_filename(company_name, job_title)
-
-        base_pdf = output_dir / f"{filename}.pdf"
-        version = 1
-        while base_pdf.exists():
-            version += 1
-            versioned_filename = f"{filename}_v{version}"
-            base_pdf = output_dir / f"{versioned_filename}.pdf"
-
-        if version > 1:
-            filename = f"{filename}_v{version}"
-            logger.info(f"File exists, using version {version}")
+        # --- Compile resume ---
+        resume_filename = generate_resume_filename(company_name, job_title)
+        resume_filename = _versioned_filename(output_dir, resume_filename)
 
         success, pdf_path, tex_path, error = compile_latex(
             latex_code=latex_code,
             output_dir=output_dir,
-            filename=filename,
+            filename=resume_filename,
         )
 
         if success and pdf_path:
             logger.info("Resume compiled successfully:")
             logger.info(f"  PDF: {pdf_path}")
             logger.info(f"  TEX: {tex_path}")
-
-            return {
-                "resume_pdf_path": str(pdf_path),
-                "resume_tex_path": str(tex_path),
-                "jobs_applied": state.get("jobs_applied", 0) + 1,
-            }
+            result["resume_pdf_path"] = str(pdf_path)
+            result["resume_tex_path"] = str(tex_path)
+            result["jobs_applied"] = state.get("jobs_applied", 0) + 1
         else:
-            # Even if PDF failed, we still have the .tex file
             logger.warning(f"PDF compilation failed, .tex file saved: {tex_path}")
+            result["resume_pdf_path"] = ""
+            result["resume_tex_path"] = str(tex_path) if tex_path else ""
+            if error:
+                result["errors"] = [error]
+            result["jobs_failed"] = state.get("jobs_failed", 0) + 1
 
-            return {
-                "resume_pdf_path": "",
-                "resume_tex_path": str(tex_path) if tex_path else "",
-                "errors": [error] if error else [],
-                "jobs_failed": state.get("jobs_failed", 0) + 1,
-            }
+        # --- Compile cover letter (if generated) ---
+        if cover_letter_latex:
+            logger.info(f"Compiling cover letter for: {company_name} - {job_title}")
+
+            cl_filename = generate_cover_letter_filename(company_name, job_title)
+            cl_filename = _versioned_filename(output_dir, cl_filename)
+
+            cl_success, cl_pdf_path, cl_tex_path, cl_error = compile_latex(
+                latex_code=cover_letter_latex,
+                output_dir=output_dir,
+                filename=cl_filename,
+            )
+
+            if cl_success and cl_pdf_path:
+                logger.info("Cover letter compiled successfully:")
+                logger.info(f"  PDF: {cl_pdf_path}")
+                logger.info(f"  TEX: {cl_tex_path}")
+                result["cover_letter_pdf_path"] = str(cl_pdf_path)
+                result["cover_letter_tex_path"] = str(cl_tex_path)
+            else:
+                logger.warning(
+                    f"Cover letter PDF compilation failed, .tex saved: {cl_tex_path}"
+                )
+                result["cover_letter_tex_path"] = (
+                    str(cl_tex_path) if cl_tex_path else ""
+                )
+                if cl_error:
+                    existing_errors = result.get("errors", [])
+                    result["errors"] = existing_errors + [f"Cover letter: {cl_error}"]
 
     except Exception as e:
         error_msg = f"Failed to compile LaTeX: {e}"
         logger.error(error_msg)
+        result["errors"] = [error_msg]
+        result["jobs_failed"] = state.get("jobs_failed", 0) + 1
 
-        return {
-            "resume_pdf_path": "",
-            "resume_tex_path": "",
-            "errors": [error_msg],
-            "jobs_failed": state.get("jobs_failed", 0) + 1,
-        }
+    return result

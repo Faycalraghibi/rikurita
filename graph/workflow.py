@@ -10,6 +10,7 @@ from typing import Literal
 from langgraph.graph import END, StateGraph
 
 from graph.nodes.apify_scraper import fetch_jobs_node, get_next_job_node
+from graph.nodes.cover_letter_generator import generate_cover_letter_node
 from graph.nodes.latex_compiler import compile_latex_node
 from graph.nodes.relevance_check import check_relevance_node
 from graph.nodes.resume_generator import generate_resume_node
@@ -100,6 +101,15 @@ def print_summary_node(state: WorkflowState) -> dict:
     logger.info(f"Jobs skipped:           {jobs_skipped}")
     logger.info(f"Jobs failed:            {jobs_failed}")
 
+    # Cover letter summary
+    cover_letter_enabled = (
+        state.get("config", {}).get("cover_letter", {}).get("enabled", False)
+    )
+    if cover_letter_enabled:
+        processed_jobs = state.get("processed_jobs", [])
+        cl_count = sum(1 for j in processed_jobs if j.get("cover_letter_path"))
+        logger.info(f"Cover letters generated: {cl_count}")
+
     errors = state.get("errors", [])
     if errors:
         logger.warning(f"\nErrors encountered ({len(errors)}):")
@@ -114,6 +124,8 @@ def print_summary_node(state: WorkflowState) -> dict:
         logger.info("\nGenerated resumes:")
         for job in applied_jobs:
             logger.info(f"  - {job.get('company_name')}: {job.get('resume_path')}")
+            if job.get("cover_letter_path"):
+                logger.info(f"    Cover letter: {job.get('cover_letter_path')}")
 
     logger.info("=" * 60)
 
@@ -136,6 +148,7 @@ def create_workflow() -> StateGraph:
     workflow.add_node("get_next_job", get_next_job_node)
     workflow.add_node("check_relevance", check_relevance_node)
     workflow.add_node("generate_resume", generate_resume_node)
+    workflow.add_node("generate_cover_letter", generate_cover_letter_node)
     workflow.add_node("compile_latex", compile_latex_node)
     workflow.add_node("log_to_sheets", log_to_sheets_node)
     workflow.add_node("log_skipped", log_skipped_job_node)
@@ -157,7 +170,9 @@ def create_workflow() -> StateGraph:
         },
     )
 
-    workflow.add_edge("generate_resume", "compile_latex")
+    # Resume → Cover Letter → Compile (siblings converging on compilation)
+    workflow.add_edge("generate_resume", "generate_cover_letter")
+    workflow.add_edge("generate_cover_letter", "compile_latex")
 
     workflow.add_edge("compile_latex", "log_to_sheets")
 

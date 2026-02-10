@@ -116,6 +116,8 @@ class ProcessedJob:
     relevance: RelevanceResult | None = None
     resume_path: str = ""
     resume_tex_path: str = ""
+    cover_letter_path: str = ""
+    cover_letter_tex_path: str = ""
     status: ApplicationStatus = ApplicationStatus.PENDING
     error: str = ""
 
@@ -127,6 +129,7 @@ class ProcessedJob:
             "relevance_reasoning": self.relevance.reasoning if self.relevance else "",
             "matching_points": self.relevance.matching_points if self.relevance else [],
             "resume_path": self.resume_path,
+            "cover_letter_path": self.cover_letter_path,
             "status": self.status.value,
             "error": self.error,
         }
@@ -158,6 +161,11 @@ class WorkflowState(TypedDict):
     generated_latex: str  # Generated LaTeX code
     resume_pdf_path: str  # Path to compiled PDF
     resume_tex_path: str  # Path to .tex source
+
+    # Cover letter generation
+    generated_cover_letter_latex: str  # Generated cover letter LaTeX code
+    cover_letter_pdf_path: str  # Path to compiled cover letter PDF
+    cover_letter_tex_path: str  # Path to cover letter .tex source
 
     # Processed jobs accumulator
     processed_jobs: Annotated[list[dict], operator.add]  # All processed jobs
@@ -209,6 +217,9 @@ def create_initial_state(
         generated_latex="",
         resume_pdf_path="",
         resume_tex_path="",
+        generated_cover_letter_latex="",
+        cover_letter_pdf_path="",
+        cover_letter_tex_path="",
         processed_jobs=[],
         total_jobs=0,
         jobs_processed=0,

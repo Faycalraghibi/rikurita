@@ -5,6 +5,7 @@ Individual workflow nodes for the job application automation.
 """
 
 from .apify_scraper import fetch_jobs_node
+from .cover_letter_generator import generate_cover_letter_node
 from .latex_compiler import compile_latex_node
 from .relevance_check import check_relevance_node
 from .resume_generator import generate_resume_node
@@ -16,6 +17,7 @@ __all__ = [
     "fetch_jobs_node",
     "check_relevance_node",
     "generate_resume_node",
+    "generate_cover_letter_node",
     "compile_latex_node",
     "log_to_sheets_node",
 ]

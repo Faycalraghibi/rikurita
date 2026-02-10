@@ -54,6 +54,10 @@ resume_template:
   base_latex_file: "templates/base_resume.tex"
   style: "modern"
 
+cover_letter:
+  enabled: true
+  base_latex_file: "templates/cover_letter_boilerplate.tex"
+
 llm_settings:
   model: "provider/model-name" # LLM provider model identifier
   max_tokens: 4096

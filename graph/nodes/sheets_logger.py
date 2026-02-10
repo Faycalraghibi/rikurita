@@ -32,6 +32,7 @@ CSV_HEADERS = [
     "Salary",
     "Description",
     "Resume Path",
+    "Cover Letter Path",
     "Application URL",
     "Relevance Score",
     "Application Status",
@@ -158,6 +159,7 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
     current_job = state.get("current_job")
     relevance_result = state.get("relevance_result") or {}
     resume_pdf_path = state.get("resume_pdf_path", "")
+    cover_letter_pdf_path = state.get("cover_letter_pdf_path", "")
     dry_run = state.get("dry_run", False)
 
     if not current_job:
@@ -210,6 +212,7 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
         current_job.get("salary", ""),
         description,
         resume_pdf_path,
+        cover_letter_pdf_path,
         current_job.get("application_url", ""),
         str(relevance_result.get("relevance_score", relevance_result.get("score", 0))),
         status,
@@ -231,6 +234,7 @@ def log_to_sheets_node(state: WorkflowState) -> dict[str, Any]:
             "relevance_score", relevance_result.get("score", 0)
         ),
         "resume_path": resume_pdf_path,
+        "cover_letter_path": cover_letter_pdf_path,
         "status": status,
     }
 
@@ -277,6 +281,7 @@ def log_skipped_job_node(state: WorkflowState) -> dict[str, Any]:
         current_job.get("salary", ""),
         "",  # No description for skipped
         "",  # No resume path
+        "",  # No cover letter path
         current_job.get("application_url", ""),
         str(score),
         ApplicationStatus.SKIPPED.value,
@@ -289,6 +294,7 @@ def log_skipped_job_node(state: WorkflowState) -> dict[str, Any]:
         **current_job,
         "relevance_score": score,
         "resume_path": "",
+        "cover_letter_path": "",
         "status": ApplicationStatus.SKIPPED.value,
     }
 
