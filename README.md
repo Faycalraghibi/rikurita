@@ -1,6 +1,6 @@
 # Rikurita
 
-Automated job application system. Scrapes LinkedIn jobs via Apify, filters by relevance, generates tailored LaTeX resumes, and logs to CSV/Google Sheets.
+Automated job application system. Scrapes LinkedIn jobs via Apify, filters by relevance, generates tailored LaTeX resumes and cover letters, and logs to CSV.
 
 ## Setup
 
@@ -64,6 +64,23 @@ track/
 `templates/resume_data.yaml`:
 - Personal info, education, experience, projects, skills
 - Used by LLM to tailor resumes for each job
+
+`templates/cover_letter_data.yaml`:
+- Defaults for cover letter structure (context, motivation, skills)
+- LLM overrides specific paragraphs based on job description
+
+## Cover Letter Generation
+
+Enabled by default in `config.yaml`:
+```yaml
+cover_letter:
+  enabled: true
+```
+
+The system generates a tailored cover letter (PDF + TeX) for each relevant job, using:
+1.  **Defaults** from `cover_letter_data.yaml`
+2.  **Overrides** from LLM (company motivation, mission alignment)
+3.  **Personal Info** from `resume_data.yaml`
 
 ## Requirements
 
